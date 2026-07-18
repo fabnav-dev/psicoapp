@@ -17,15 +17,24 @@
     catch (e) { return [{ role: "user", content: String(arg) }]; }
   }
   async function server(arg) {
-    var res = await fetch("/api/claude", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: toMessages(arg) })
-    });
-    var data = null;
-    try { data = await res.json(); } catch (e) {}
-    if (!res.ok) throw new Error((data && data.error) || ("HTTP " + res.status));
-    return (data && data.text) || "";
+    var intento = 0;
+    while (true) {
+      var res = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: toMessages(arg) })
+      });
+      var data = null;
+      try { data = await res.json(); } catch (e) {}
+      if (res.ok) return (data && data.text) || "";
+      // IA saturada o error temporal → reintentar hasta 2 veces
+      if ((res.status === 429 || res.status === 529 || res.status >= 500) && intento < 2) {
+        intento++;
+        await new Promise(function (r) { setTimeout(r, 1500 * intento); });
+        continue;
+      }
+      throw new Error((data && data.error) || ("HTTP " + res.status));
+    }
   }
   window.claude = {
     complete: async function (arg) {
