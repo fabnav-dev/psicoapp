@@ -1,4 +1,9 @@
 // Servidor de IA · App Psicoeducativa (Vercel Serverless Function)
+// La llave de Anthropic se guarda como variable de entorno ANTHROPIC_API_KEY
+// en Vercel (Project → Settings → Environment Variables). Nunca en el código.
+//
+// Prueba varios modelos en orden y usa el primero disponible para la llave,
+// evitando el 404 "model not found" cuando un modelo queda retirado.
 const MODELOS = [
   "claude-sonnet-4-5",
   "claude-sonnet-4-20250514",
@@ -25,25 +30,37 @@ export default async function handler(req, res) {
 
     let ultimoError = "Error de la IA.";
     let ultimoStatus = 500;
+    const espera = (ms)=> new Promise(function(r){ setTimeout(r, ms); });
     for (const model of candidatos) {
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({ model, max_tokens: maxTokens, messages })
-      });
-      const data = await r.json();
-      if (r.ok) {
-        const text = (data.content || []).map(function (c) { return c.text || ""; }).join("");
-        res.status(200).json({ text, model });
-        return;
+      let reintentos = 0;
+      while (true) {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01"
+          },
+          body: JSON.stringify({ model, max_tokens: maxTokens, messages })
+        });
+        const data = await r.json();
+        if (r.ok) {
+          const text = (data.content || []).map(function (c) { return c.text || ""; }).join("");
+          res.status(200).json({ text, model });
+          return;
+        }
+        ultimoStatus = r.status;
+        ultimoError = (data && data.error && data.error.message) || ("HTTP " + r.status);
+        // 429/529 = IA saturada → esperar y reintentar el mismo modelo (hasta 3 veces)
+        if ((r.status === 429 || r.status === 529) && reintentos < 3) {
+          reintentos++;
+          await espera(1200 * reintentos);
+          continue;
+        }
+        break; // otros errores (incl. 404) → salir del while y probar el siguiente modelo
       }
-      ultimoStatus = r.status;
-      ultimoError = (data && data.error && data.error.message) || ("HTTP " + r.status);
-      if (r.status !== 404) break;
+      // 404 = modelo no disponible → probar el siguiente; otro error → cortar
+      if (ultimoStatus !== 404) break;
     }
     res.status(ultimoStatus).json({ error: ultimoError });
   } catch (e) {
