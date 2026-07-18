@@ -86,6 +86,43 @@ function shrinkImageDataUrl(dataUrl, maxEdge){
     }catch(e){ resolve(dataUrl); }
   });
 }
+
+// ─── Informe médico en Supabase Storage (bucket "informes") ──────────
+// Sube el archivo al bucket y devuelve la ruta; si no hay nube, cae a base64.
+async function subirInformeArchivo(estId, file){
+  const sb = window.PSICO_SB;
+  const esImagen = /^image\//.test(file.type);
+  if(sb){
+    let blob = file, tipo = file.type;
+    if(esImagen){ try{ const du=await new Promise(r=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.readAsDataURL(file); }); const small=await shrinkImageDataUrl(du,1800); const res=await fetch(small); blob=await res.blob(); tipo='image/jpeg'; }catch(_){} }
+    const ext = tipo==='image/jpeg' ? 'jpg' : (file.name.split('.').pop()||'bin').toLowerCase();
+    const path = `${estId}/${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from('informes').upload(path, blob, { contentType:tipo, upsert:true });
+    if(error) throw new Error(error.message);
+    return { nombre:file.name, tipo, path, origen:'Equipo' };
+  }
+  // Modo local (sin nube): base64 como antes
+  const du = await new Promise(r=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.readAsDataURL(file); });
+  let dataUrl=du, tipo=file.type;
+  if(esImagen){ try{ dataUrl=await shrinkImageDataUrl(du,1800); tipo='image/jpeg'; }catch(_){} }
+  return { nombre:file.name, tipo, dataUrl, origen:'Equipo' };
+}
+// Devuelve una URL temporal firmada para ver/descargar el informe guardado en Storage
+async function urlInforme(rec){
+  if(!rec) return null;
+  if(rec.dataUrl) return rec.dataUrl;
+  const sb = window.PSICO_SB;
+  if(sb && rec.path){ try{ const { data } = await sb.storage.from('informes').createSignedUrl(rec.path, 3600); return data && data.signedUrl; }catch(_){} }
+  return null;
+}
+// Descarga el informe como dataUrl base64 (para enviárselo a la IA)
+async function informeDataUrl(rec){
+  if(!rec) return null;
+  if(rec.dataUrl) return rec.dataUrl;
+  const sb = window.PSICO_SB;
+  if(sb && rec.path){ try{ const { data, error } = await sb.storage.from('informes').download(rec.path); if(error||!data) return null; return await new Promise(r=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.readAsDataURL(data); }); }catch(_){} }
+  return null;
+}
 const lsGet=(k,fb)=>{ try{ const v=localStorage.getItem(k); return v!=null?JSON.parse(v):fb; }catch(e){ return fb; } };
 const lsSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
 const PTA_KEY = 'psico_pta_v1';
@@ -105,13 +142,14 @@ function ptaTipoColor(tipo){ return { Prueba:'#B23A24', Trabajo:'#2563B8', Guía
 
 // ─── Informe médico: existe solo cuando se carga uno real (o demo seed) ───
 const INF_KEY = 'psico_informe_v1';
-function infLoad(){ try{ return JSON.parse(localStorage.getItem(INF_KEY)||'{}'); }catch(e){ return {}; } }
-function infSave(d){ try{ localStorage.setItem(INF_KEY, JSON.stringify(d)); }catch(e){} window.dispatchEvent(new Event('inf-change')); }
+let INF_MEM = null;
+function infLoad(){ if(INF_MEM) return INF_MEM; try{ INF_MEM = JSON.parse(localStorage.getItem(INF_KEY)||'{}'); }catch(e){ INF_MEM={}; } return INF_MEM; }
+function infSave(d){ INF_MEM = d; try{ localStorage.setItem(INF_KEY, JSON.stringify(d)); }catch(e){} window.dispatchEvent(new Event('inf-change')); }
 function useInforme(){
   const [data,setData]=useState(infLoad);
-  useEffect(()=>{ const h=()=>setData(infLoad()); window.addEventListener('inf-change',h); window.addEventListener('storage',h); return ()=>{ window.removeEventListener('inf-change',h); window.removeEventListener('storage',h); }; },[]);
-  const cargar=(estId,meta)=>{ const d=infLoad(); d[estId]={ fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), origen:'Equipo', ...(meta||{}) }; infSave(d); };
-  const quitar=(estId)=>{ const d=infLoad(); delete d[estId]; infSave(d); };
+  useEffect(()=>{ const h=()=>setData(infLoad()); window.addEventListener('inf-change',h); window.addEventListener('storage',()=>{ INF_MEM=null; setData(infLoad()); }); return ()=>{ window.removeEventListener('inf-change',h); }; },[]);
+  const cargar=(estId,meta)=>{ const d={...infLoad()}; d[estId]={ fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), origen:'Equipo', ...(meta||{}) }; infSave(d); };
+  const quitar=(estId)=>{ const d={...infLoad()}; delete d[estId]; infSave(d); };
   return { data, cargar, quitar };
 }
 // Los estudiantes de demostración (seed e1..e5) traen informe cargado; los agregados manualmente, no.
@@ -829,7 +867,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const toggleFirmante=(r)=> setFirmantesSel(p=>({...p,[r]:!p[r]}));
   const [verInforme,setVerInforme]=useState(false);
   const inf=useInforme();
-  const tieneInforme = esSeedDemo(est) || !!(inf.data[est.id] && inf.data[est.id].dataUrl);
+  const tieneInforme = esSeedDemo(est) || !!(inf.data[est.id] && (inf.data[est.id].dataUrl || inf.data[est.id].path));
   const [iaSintesis,setIaSintesis]=useState(null);
   const esNEE = !est.sinNee;
   const [tab,setTab]=useState(esNEE?'resumen':'academico');
@@ -852,7 +890,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const adecSet = planId==='PAEC' ? ADEC_EVAL : planId==='PSM' ? ADEC_PSM : ADEC_ACCESO;
   // Publica el estudiante abierto para que el Copiloto IA tenga contexto
   useEffect(()=>{
-    window.__psicoStudentCtx = { nombre:est.nombre, curso:est.curso, diag:est.diag||'', plan:(plan&&plan.full)||'', resumen:(iaSintesis&&iaSintesis.resumen)||'' };
+    window.__psicoStudentCtx = { nombre:est.nombre, curso:est.curso, diag:est.diag||'', plan:(plan&&plan.full)||'', planNombre:(plan&&plan.nombre)||'', resumen:(iaSintesis&&iaSintesis.resumen)||'', adec:(adecSet||[]).map(g=>({ tipo:g.tipo, items:g.items })) };
     window.dispatchEvent(new Event('psico-student'));
     return ()=>{ window.__psicoStudentCtx=null; window.dispatchEvent(new Event('psico-student')); };
   }, [est.id, planId, iaSintesis]);
@@ -862,14 +900,15 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const generar=async()=>{
     const rec = inf.data[est.id];
     const seed = esSeedDemo(est);
-    if(!seed && !(rec && rec.dataUrl)){ onToast('Primero carga el informe del especialista'); return; }
+    if(!seed && !(rec && (rec.dataUrl || rec.path))){ onToast('Primero carga el informe del especialista'); return; }
     setPhase('generando'); setModo('ia');
     const set = planId==='PAEC' ? ADEC_EVAL : planId==='PSM' ? ADEC_PSM : ADEC_ACCESO;
     const cat = set.map((g,gi)=>`Grupo ${gi} — ${g.tipo}:\n`+g.items.map((it,ii)=>`  ${gi}-${ii}: ${it}`).join('\n')).join('\n');
     const instrucc=`Eres un especialista en educación diferencial (Chile). Debes pre-rellenar un ${plan.full} (${plan.nombre}) para ${est.nombre} (${est.edad||'edad no indicada'}, curso ${est.curso}, diagnóstico ${est.diag||'no indicado'}) a partir EXCLUSIVAMENTE del informe del especialista.\n\nReglas estrictas:\n- Marca SOLO las adecuaciones que el informe respalde de forma explícita o claramente implícita.\n- Si el informe no menciona algo, NO lo marques.\n- El resumen y los objetivos deben basarse ÚNICAMENTE en lo que dice el informe. No inventes datos clínicos ni apoyos que el informe no mencione.\n- Si el informe es ilegible o no aporta información suficiente, devuelve "marcar":[] y explica en "resumen" que el informe no permite determinar las adecuaciones.\n\nLista de adecuaciones posibles (usa las claves gi-ii):\n${cat}\n\nResponde ÚNICAMENTE un JSON válido, sin texto adicional:\n{"resumen":"2-3 frases basadas en el informe","marcar":["gi-ii", ...],"objetivos":["objetivo 1","objetivo 2","objetivo 3"]}`;
     let content;
-    if(rec && rec.dataUrl){
-      let du = rec.dataUrl;
+    const _du = (rec && (rec.dataUrl || rec.path)) ? await informeDataUrl(rec) : null;
+    if(_du){
+      let du = _du;
       if(/^data:image\//.test(du)){ du = await shrinkImageDataUrl(du, 1568); }
       const mm = /^data:([^;]+);base64,(.*)$/.exec(du);
       const blocks = [{ type:'text', text: instrucc + '\n\nEl informe del especialista está adjunto a continuación. Léelo con atención:' }];
@@ -1034,14 +1073,14 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
                 <div style={{ fontSize:10, color:t.muted, marginTop:1 }}>{DOC_CATS.informe.label} · {esSeedDemo(est)?'del apoderado · 10 jun 2026':`cargado por ${(inf.data[est.id]&&inf.data[est.id].origen)||'Equipo'} · ${inf.data[est.id]&&inf.data[est.id].fecha||''}`}</div>
               </div>
             </button>
-            <button onClick={()=>{ const r=inf.data[est.id]; if(r&&r.dataUrl){ const a=document.createElement('a'); a.href=r.dataUrl; a.download=r.nombre||'informe'; a.click(); onToast('Descargando '+(r.nombre||'archivo')); } else { imprimirInformeMedico(est); onToast('Descargando informe médico'); } }} title="Descargar" style={{ flexShrink:0, background:'none', border:'none', borderLeft:`1px solid ${t.border}`, padding:'0 14px', alignSelf:'stretch', cursor:'pointer', color:DOC_CATS.informe.color }}><Icon k="download" c={DOC_CATS.informe.color} s={17} /></button>
+            <button onClick={async ()=>{ const r=inf.data[est.id]; const u=await urlInforme(r); if(u){ const a=document.createElement('a'); a.href=u; a.download=r.nombre||'informe'; a.target='_blank'; a.click(); onToast('Descargando '+(r.nombre||'archivo')); } else { imprimirInformeMedico(est); onToast('Descargando informe médico'); } }} title="Descargar" style={{ flexShrink:0, background:'none', border:'none', borderLeft:`1px solid ${t.border}`, padding:'0 14px', alignSelf:'stretch', cursor:'pointer', color:DOC_CATS.informe.color }}><Icon k="download" c={DOC_CATS.informe.color} s={17} /></button>
           </div>
           ) : (
           <div style={{ background:t.card, border:`1px dashed ${t.border}`, borderRadius:12, padding:'14px 15px', textAlign:'center' }}>
             <div style={{ width:38, height:38, borderRadius:10, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px' }}><Icon k="doc" c={t.muted} s={19} /></div>
             <div style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>Aún no hay informe médico cargado</div>
             <div style={{ fontSize:10.5, color:t.muted, marginTop:2, lineHeight:1.5 }}>Llega cuando el apoderado lo sube y el equipo lo procesa. Si lo tienes en mano, cárgalo directamente (PDF o imagen).</div>
-            <label style={{ marginTop:11, padding:'9px 16px', background:t.primary, color:'#fff', border:'none', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7 }}><Icon k="download" c="#fff" s={15} />Seleccionar archivo…<input type="file" accept="application/pdf,image/*" style={{ display:'none' }} onChange={(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; if(f.size>4*1024*1024){ onToast('El archivo supera 4 MB'); e.target.value=''; return; } const rd=new FileReader(); rd.onload=()=>{ inf.cargar(est.id,{ nombre:f.name, tipo:f.type, dataUrl:rd.result, origen:'Equipo' }); onToast('Informe cargado: '+f.name); }; rd.readAsDataURL(f); }} /></label>
+            <label style={{ marginTop:11, padding:'9px 16px', background:t.primary, color:'#fff', border:'none', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7 }}><Icon k="download" c="#fff" s={15} />Seleccionar archivo…<input type="file" accept="application/pdf,image/*" style={{ display:'none' }} onChange={async (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f){ return; } const esImagen=/^image\//.test(f.type); if(!esImagen && f.size>10*1024*1024){ onToast('El PDF supera 10 MB; comprímelo o súbelo como foto'); e.target.value=''; return; } onToast('Subiendo informe…'); try{ const meta=await subirInformeArchivo(est.id, f); inf.cargar(est.id, meta); onToast('Informe cargado: '+f.name); }catch(err){ onToast('No se pudo subir el informe: '+(err.message||'error')); } e.target.value=''; }} /></label>
           </div>
           )}
           {/* planes */}
@@ -1310,9 +1349,11 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
 
 // ─── Visor del informe médico externo ────────────────────────────
 function InformeModal({ t, est, rec, demo, onClose }){
-  const real = rec && rec.dataUrl;
+  const real = rec && (rec.dataUrl || rec.path);
   const titulo = (rec && rec.nombre) || 'Informe Neurología.pdf';
-  const esImg = real && /^image\//.test(rec.tipo||'');
+  const esImg = real && /^image\//.test((rec && rec.tipo)||'');
+  const [url,setUrl] = useState(rec && rec.dataUrl ? rec.dataUrl : null);
+  useEffect(()=>{ let vivo=true; if(real && !url){ urlInforme(rec).then(u=>{ if(vivo) setUrl(u); }); } return ()=>{ vivo=false; }; },[real]);
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(20,28,45,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, zIndex:150 }} className="fade">
       <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:14, maxWidth:560, width:'100%', maxHeight:'88vh', overflowY:'auto', boxShadow:'0 30px 80px rgba(0,0,0,0.4)' }} className="scale">
@@ -1322,10 +1363,12 @@ function InformeModal({ t, est, rec, demo, onClose }){
         </div>
         {real ? (
           <div style={{ padding:16 }}>
-            {esImg
-              ? <img src={rec.dataUrl} alt={titulo} style={{ width:'100%', borderRadius:8, display:'block' }} />
-              : <iframe src={rec.dataUrl} title={titulo} style={{ width:'100%', height:'70vh', border:'none', borderRadius:8 }} />}
-            <a href={rec.dataUrl} download={titulo} style={{ display:'inline-flex', alignItems:'center', gap:7, marginTop:12, padding:'9px 16px', background:t.primary, color:'#fff', borderRadius:9, fontSize:12, fontWeight:700, textDecoration:'none' }}><Icon k="download" c="#fff" s={15} />Descargar archivo</a>
+            {!url
+              ? <div style={{ padding:'40px 0', textAlign:'center', color:t.muted, fontSize:12.5 }}>Cargando informe…</div>
+              : esImg
+                ? <img src={url} alt={titulo} style={{ width:'100%', borderRadius:8, display:'block' }} />
+                : <iframe src={url} title={titulo} style={{ width:'100%', height:'70vh', border:'none', borderRadius:8 }} />}
+            {url && <a href={url} download={titulo} target="_blank" style={{ display:'inline-flex', alignItems:'center', gap:7, marginTop:12, padding:'9px 16px', background:t.primary, color:'#fff', borderRadius:9, fontSize:12, fontWeight:700, textDecoration:'none' }}><Icon k="download" c="#fff" s={15} />Descargar archivo</a>}
           </div>
         ) : demo ? (
         <div style={{ padding:'26px 30px', fontSize:12.5, color:'#2a2f45', lineHeight:1.6 }}>
@@ -2620,6 +2663,19 @@ function A11yControl({ a11y, setA11y, t, dark, setDark }){
 }
 
 // ─── Copiloto IA conversacional (equipo) ────────────────────────
+function mdClean(s){
+  return String(s||'')
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{20D0}-\u{20FF}\u{1F1E6}-\u{1F1FF}]/gu,'')
+    .replace(/^#{1,6}\s*/gm,'')
+    .replace(/\*\*(.*?)\*\*/g,'$1')
+    .replace(/__(.*?)__/g,'$1')
+    .replace(/(^|[^*])\*(?!\*)([^*\n]+?)\*(?!\*)/g,'$1$2')
+    .replace(/`/g,'')
+    .replace(/^\s*[-–—]{3,}\s*$/gm,'')
+    .replace(/\n{3,}/g,'\n\n')
+    .replace(/[ \t]+\n/g,'\n')
+    .trim();
+}
 function CopilotoIA({ t }){
   const [open,setOpen]=useState(false);
   const [msgs,setMsgs]=useState([{ rol:'ia', txt:'Hola. Soy tu copiloto psicoeducativo. Puedo ayudarte a redactar objetivos, resumir un informe, sugerir adecuaciones por diagnóstico o priorizar casos. ¿En qué trabajamos?' }]);
@@ -2630,8 +2686,9 @@ function CopilotoIA({ t }){
   useEffect(()=>{ if(finRef.current) finRef.current.scrollTop=finRef.current.scrollHeight; },[msgs,cargando]);
   useEffect(()=>{ const h=()=>setAlumno(window.__psicoStudentCtx||null); window.addEventListener('psico-student',h); return ()=>window.removeEventListener('psico-student',h); },[]);
 
-  const ctx = `Eres un asistente psicoeducativo experto del Colegio Mayor Peñalolén (Chile). Ayudas al equipo (educadoras diferenciales, psicólogas, terapeutas ocupacionales) con estudiantes con NEE. Conoces los documentos PAI, PACI, PAEC y Plan de Salud Mental, y la normativa chilena (Decreto 83/2015, Decreto 67/2018). Responde en español, conciso, práctico y cálido.`;
-  const ctxAlumno = alumno ? `\n\nESTUDIANTE ACTUALMENTE ABIERTO EN PANTALLA: ${alumno.nombre} (curso ${alumno.curso}${alumno.diag?', diagnóstico '+alumno.diag:''}).${alumno.plan?' Documento abierto: '+alumno.plan+'.':''}${alumno.resumen?' Síntesis del informe: '+alumno.resumen:''}\nSi el usuario pregunta por "este estudiante", "el/la estudiante" o no nombra a nadie, se refiere a ${alumno.nombre}. Basa tus respuestas en este estudiante salvo que el usuario nombre a otro.` : `\n\nNo hay ninguna ficha de estudiante abierta en este momento. Si el usuario pregunta por un estudiante específico, pídele que abra su ficha primero.`;
+  const ctx = `Eres un asistente psicoeducativo experto del Colegio Mayor Peñalolén (Chile). Ayudas al equipo (educadoras diferenciales, psicólogas, terapeutas ocupacionales) con estudiantes con NEE. Conoces los documentos PAI, PACI, PAEC y Plan de Salud Mental, y la normativa chilena (Decreto 83/2015, Decreto 67/2018). Responde en español, conciso, práctico y cálido.\n\nFORMATO DE RESPUESTA: escribe en texto plano y limpio. NO uses markdown (nada de ###, **, ni líneas ---) ni emojis. Usa títulos en MAYÚSCULAS y listas con guion simple. Cuando te pidan completar o sugerir adecuaciones de un plan (PAI/PACI/PAEC/PSM), responde SIEMPRE usando las secciones y los ítems EXACTOS del plan abierto que se listan más abajo, agrupados por su sección, e indica para cada uno si conviene MARCARLO o no según el diagnóstico. No inventes ítems que no estén en esa lista, y NO agregues categorías propias (como "Ubicación", "Ambiente", "Tiempos"): usa únicamente los nombres de sección e ítems textuales del plan.`;
+  const ctxPlan = (alumno && alumno.adec && alumno.adec.length) ? `\n\nESTRUCTURA EXACTA DEL PLAN ABIERTO (${alumno.planNombre||alumno.plan}). Usa estas secciones e ítems textuales al sugerir adecuaciones:\n`+alumno.adec.map(g=>`• ${g.tipo}\n`+g.items.map(it=>`   - ${it}`).join('\n')).join('\n') : '';
+  const ctxAlumno = alumno ? `\n\nESTUDIANTE ACTUALMENTE ABIERTO EN PANTALLA: ${alumno.nombre} (curso ${alumno.curso}${alumno.diag?', diagnóstico '+alumno.diag:''}).${alumno.plan?' Documento abierto: '+alumno.plan+'.':''}${alumno.resumen?' Síntesis del informe: '+alumno.resumen:''}\nSi el usuario pregunta por "este estudiante", "el/la estudiante" o no nombra a nadie, se refiere a ${alumno.nombre}. Basa tus respuestas en este estudiante salvo que el usuario nombre a otro.`+ctxPlan : `\n\nNo hay ninguna ficha de estudiante abierta en este momento. Si el usuario pregunta por un estudiante específico, pídele que abra su ficha primero.`;
   const sugerencias = alumno
     ? [`Redacta 3 objetivos para ${alumno.nombre}`, `Sugiere adecuaciones para ${alumno.nombre}`, `Resume el caso de ${alumno.nombre}`]
     : ['Sugiere adecuaciones para un estudiante con TDAH','¿Qué casos debería priorizar esta semana?','¿Qué diferencia hay entre PAI y PACI?'];
@@ -2658,7 +2715,7 @@ function CopilotoIA({ t }){
           </div>
           <div ref={finRef} style={{ flex:1, overflowY:'auto', padding:14, display:'flex', flexDirection:'column', gap:10, background:t.bg }}>
             {msgs.map((m,i)=>(
-              <div key={i} style={{ alignSelf:m.rol==='user'?'flex-end':'flex-start', maxWidth:'85%', background:m.rol==='user'?t.primary:'#fff', color:m.rol==='user'?'#fff':t.ink, border:m.rol==='user'?'none':`1px solid ${t.border}`, borderRadius:13, padding:'9px 12px', fontSize:12, lineHeight:1.5, whiteSpace:'pre-wrap' }}>{m.txt}</div>
+              <div key={i} style={{ alignSelf:m.rol==='user'?'flex-end':'flex-start', maxWidth:'85%', background:m.rol==='user'?t.primary:'#fff', color:m.rol==='user'?'#fff':t.ink, border:m.rol==='user'?'none':`1px solid ${t.border}`, borderRadius:13, padding:'9px 12px', fontSize:12, lineHeight:1.5, whiteSpace:'pre-wrap' }}>{m.rol==='ia'?mdClean(m.txt):m.txt}</div>
             ))}
             {cargando && <div style={{ alignSelf:'flex-start', background:'#fff', border:`1px solid ${t.border}`, borderRadius:13, padding:'9px 14px', fontSize:12, color:t.muted }}>Pensando…</div>}
             {msgs.length===1 && !cargando && (

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>App Psicoeducativa · Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  html { color-scheme:light; }
+  html, body { height:100%; background:#0e1726; }
+  #root { height:100%; }
+  input, textarea, select, button { font-family:inherit; }
+  input, textarea, select { background:#fff; color:#1a1a1a; }
+  input::placeholder, textarea::placeholder { color:#9aa3b0; }
+  ::-webkit-scrollbar{ width:5px; } ::-webkit-scrollbar-thumb{ background:rgba(0,0,0,0.18); border-radius:3px; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:none;} }
+  @keyframes scaleIn { from{opacity:0;transform:scale(.96);} to{opacity:1;transform:scale(1);} }
+  @keyframes slideIn { from{opacity:0;transform:translateX(20px);} to{opacity:1;transform:none;} }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+  .fade{ animation:fadeUp .3s ease; } .scale{ animation:scaleIn .25s ease; } .slide{ animation:slideIn .3s ease; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="psico-config.js"></script>
+<script src="ai-bridge.js"></script>
+<script type="text/babel" src="psicoed-screens.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// ─── Persistencia local (capa 1): guarda en el navegador y sobrevive recargas ──
+const LS = {
+  get(k, fb){ try{ const v=localStorage.getItem(k); return v!=null ? JSON.parse(v) : (typeof fb==='function'?fb():fb); }catch(e){ return (typeof fb==='function'?fb():fb); } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function usePersist(key, initial){
+  const [v, setV] = useState(()=> LS.get(key, initial));
+  useEffect(()=>{ LS.set(key, v); }, [key, v]);
+  return [v, setV];
+}
+
+// ─── Capa 2: Nube compartida por colegio (Supabase) ────────────────
+// Se activa solo si psico-config.js tiene llaves. Sin llaves = modo local.
+const PSICO_SUPA = (window.PSICO_SUPA || {});
+const CLOUD_ON = !!(PSICO_SUPA.url && PSICO_SUPA.anon && window.supabase);
+const sb = CLOUD_ON ? window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.anon) : null;
+window.PSICO_SB = sb; // expuesto para subir/leer informes desde Storage (bucket "informes")
+const WORKSPACE = PSICO_SUPA.workspace || 'colegio';
+// Todas las claves de datos que ya guarda la capa 1 en localStorage
+const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1'];
+const ROLES = [
+  { id:'equipo',    label:'Equipo Psicoeducativo' },
+  { id:'profesor',  label:'Profesor(a)' },
+  { id:'apoderado', label:'Apoderado(a)' },
+  { id:'gestion',   label:'Gestión / Dirección' },
+  { id:'salud',     label:'Salud · TENS' },
+];
+// Trae el estado del colegio desde la nube y lo vuelca en localStorage
+async function cloudLoad(){
+  try{
+    const { data, error } = await sb.from('psico_estado').select('data').eq('workspace', WORKSPACE).maybeSingle();
+    if(error){ console.warn('cloudLoad', error.message); return; }
+    const blob = data && data.data ? data.data : null;
+    if(blob){ Object.keys(blob).forEach(k=>{ try{ localStorage.setItem(k, JSON.stringify(blob[k])); }catch(e){} }); }
+  }catch(e){ console.warn('cloudLoad', e.message); }
+}
+// Sube (upsert) todo el estado del colegio como un solo blob compartido
+async function cloudSave(){
+  try{
+    const blob = {};
+    PKEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null){ try{ blob[k]=JSON.parse(v); }catch(e){} } });
+    const { error } = await sb.from('psico_estado').upsert({ workspace:WORKSPACE, data:blob, updated_at:new Date().toISOString() }, { onConflict:'workspace' });
+    if(error) console.warn('cloudSave', error.message);
+  }catch(e){ console.warn('cloudSave', e.message); }
+}
+// Marca "sucio" cuando cambia cualquier dato psico_ para disparar el guardado
+if(CLOUD_ON){
+  const _set = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = (k, v)=>{ _set(k, v); if(String(k).indexOf('psico_')===0) window.dispatchEvent(new Event('psico-cloud-dirty')); };
+}
+
+// ─── 3 DIRECCIONES VISUALES ──────────────────────────────────────
+const THEMES = {
+  sereno: {
+    name:'Clínico Sereno', tag:'Calma · confianza · cuidado',
+    font:'"Plus Jakarta Sans", system-ui, sans-serif', display:'"Fraunces", serif',
+    primary:'#2C7A6B', primaryDark:'#1E5A4E', accent:'#E8A23C', ink:'#16302B',
+    bg:'#EEF4F2', card:'#fff', border:'rgba(44,122,107,0.16)', muted:'#5E7A73', soft:'#DCEAE6',
+    radius:18, headerGrad:'radial-gradient(130% 180% at 85% 10%, #2C7A6B 0%, #245F53 45%, #1E5A4E 100%)',
+  },
+  humano: {
+    name:'Cálido Humano', tag:'Cercanía · acogida · familia',
+    font:'"Outfit", system-ui, sans-serif', display:'"Outfit", sans-serif',
+    primary:'#E07856', primaryDark:'#C25A3C', accent:'#3C8DBC', ink:'#3A2218',
+    bg:'#FBF3EE', card:'#fff', border:'rgba(224,120,86,0.18)', muted:'#9A6F5E', soft:'#FAE4DA',
+    radius:22, headerGrad:'radial-gradient(130% 180% at 85% 10%, #E07856 0%, #CF6647 45%, #C25A3C 100%)',
+  },
+  indigo: {
+    name:'Profesional Índigo', tag:'Moderno · institucional · claro',
+    font:'"Plus Jakarta Sans", system-ui, sans-serif', display:'"Plus Jakarta Sans", sans-serif',
+    primary:'#4F46C7', primaryDark:'#3A33A0', accent:'#16B8A6', ink:'#1B1F3B',
+    bg:'#F1F2FA', card:'#fff', border:'rgba(79,70,199,0.15)', muted:'#6B6F92', soft:'#E5E6F7',
+    radius:16, headerGrad:'radial-gradient(130% 180% at 85% 10%, #4F46C7 0%, #443BB3 45%, #3A33A0 100%)',
+  },
+};
+
+function CloudSplashPsico({ base }){
+  const P = base || { primary:'#4F46C7', headerGrad:'radial-gradient(130% 180% at 85% 10%, #4F46C7 0%, #443BB3 45%, #3A33A0 100%)', font:'"Plus Jakarta Sans", sans-serif' };
+  return (
+    <div style={{ height:'100%', background:P.headerGrad, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:P.font }}>
+      <div style={{ textAlign:'center', color:'#fff' }}>
+        <img src="logo-blanco.png" height={92} style={{ width:'auto', objectFit:'contain', animation:'pulse 1.6s ease-in-out infinite' }} onError={e=>{e.target.style.display='none';}} alt="" />
+        <div style={{ marginTop:16, fontSize:14, fontWeight:600, color:'rgba(255,255,255,0.85)' }}>Cargando la información del colegio…</div>
+      </div>
+    </div>
+  );
+}
+
+function LoginCloudPsico({ base, role, onBack }){
+  const P = base || (typeof THEMES!=='undefined' && THEMES.sereno);
+  const roleLabel = (ROLES.find(r=>r.id===role)||{}).label || 'Colegio';
+  const [modo, setModo] = useState('in');        // in | up | recover
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);          // {tipo:'err'|'ok', txt}
+  const submit = async ()=>{
+    setMsg(null);
+    if(!email.trim()){ setMsg({tipo:'err',txt:'Ingresa tu correo.'}); return; }
+    setLoading(true);
+    try{
+      if(modo==='recover'){
+        const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.origin+location.pathname });
+        if(error) throw error;
+        setMsg({tipo:'ok',txt:'Te enviamos un correo para restablecer tu contraseña.'});
+      } else if(modo==='up'){
+        if(!nombre.trim()){ setMsg({tipo:'err',txt:'Ingresa tu nombre.'}); setLoading(false); return; }
+        if(pass.length<6){ setMsg({tipo:'err',txt:'La contraseña debe tener al menos 6 caracteres.'}); setLoading(false); return; }
+        const { data, error } = await sb.auth.signUp({ email:email.trim(), password:pass, options:{ data:{ nombre:nombre.trim(), role } } });
+        if(error) throw error;
+        if(!data.session) setMsg({tipo:'ok',txt:'Cuenta creada. Revisa tu correo y confirma tu cuenta para ingresar.'});
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email:email.trim(), password:pass });
+        if(error) throw error;
+      }
+    }catch(e){
+      const m = e.message||'Error';
+      setMsg({tipo:'err', txt: /invalid login/i.test(m)?'Correo o contraseña incorrectos.': /already registered/i.test(m)?'Ese correo ya tiene cuenta. Inicia sesión.': m });
+    }
+    setLoading(false);
+  };
+  const inp = { width:'100%', padding:'12px 14px', borderRadius:11, border:'1px solid rgba(0,0,0,0.12)', fontSize:14, marginTop:9, outline:'none' };
+  const lbl = { fontSize:11.5, fontWeight:700, color:P.muted, textTransform:'uppercase', letterSpacing:0.4 };
+  return (
+    <div style={{ height:'100%', background:P.headerGrad, display:'flex', alignItems:'center', justifyContent:'center', padding:24, fontFamily:P.font, overflowY:'auto' }}>
+      <div style={{ maxWidth:380, width:'100%' }} className="scale">
+        <div style={{ textAlign:'center', color:'#fff', marginBottom:18 }}>
+          <img src="logo-blanco.png" height={156} style={{ width:'auto', objectFit:'contain' }} onError={e=>{e.target.style.display='none';}} alt="" />
+          <div style={{ fontFamily:P.display||P.font, fontSize:21, fontWeight:700, marginTop:10 }}>App Psicoeducativa</div>
+          <div style={{ display:'inline-block', marginTop:8, background:P.accent, color:P.ink, fontSize:11.5, fontWeight:800, padding:'4px 13px', borderRadius:7, letterSpacing:0.3 }}>{roleLabel}</div>
+        </div>
+        <div style={{ background:'#fff', borderRadius:P.radius||16, padding:'22px 20px', boxShadow:'0 20px 50px rgba(0,0,0,0.25)' }}>
+          <div style={{ fontSize:13.5, fontWeight:700, color:P.ink, marginBottom:4 }}>{modo==='up'?'Crea tu cuenta':modo==='recover'?'Recuperar contraseña':'Iniciar sesión'}</div>
+          {modo==='up' && <>
+            <div style={{ ...lbl, marginTop:10 }}>Nombre completo</div>
+            <input style={inp} value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej: Camila Jara" />
+          </>}
+          <div style={{ ...lbl, marginTop: modo==='up'?14:10 }}>Correo</div>
+          <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu.correo@colegio.cl" />
+          {modo!=='recover' && <>
+            <div style={{ ...lbl, marginTop:14 }}>Contraseña</div>
+            <input style={inp} type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" onKeyDown={e=>{ if(e.key==='Enter') submit(); }} />
+          </>}
+          {msg && <div style={{ marginTop:13, fontSize:12.5, fontWeight:600, color: msg.tipo==='err'?'#C2413A':P.primary, background: msg.tipo==='err'?'#FBECEA':P.soft, padding:'9px 12px', borderRadius:9 }}>{msg.txt}</div>}
+          <button onClick={submit} disabled={loading} style={{ width:'100%', marginTop:16, padding:'13px', borderRadius:12, border:'none', background:P.primary, color:'#fff', fontSize:14.5, fontWeight:700, cursor:'pointer', opacity:loading?0.7:1 }}>
+            {loading?'Procesando…':(modo==='up'?'Crear cuenta':modo==='recover'?'Enviar correo':'Ingresar')}
+          </button>
+          <div style={{ marginTop:14, textAlign:'center', fontSize:12.5, color:P.muted }}>
+            {modo==='in' && <>
+              <span style={{ cursor:'pointer', color:P.primary, fontWeight:700 }} onClick={()=>{ setModo('up'); setMsg(null); }}>Crear cuenta</span>
+              <span style={{ margin:'0 8px', opacity:0.4 }}>·</span>
+              <span style={{ cursor:'pointer' }} onClick={()=>{ setModo('recover'); setMsg(null); }}>Olvidé mi contraseña</span>
+            </>}
+            {modo!=='in' && <span style={{ cursor:'pointer', color:P.primary, fontWeight:700 }} onClick={()=>{ setModo('in'); setMsg(null); }}>← Volver a ingresar</span>}
+          </div>
+        </div>
+        <div style={{ textAlign:'center', marginTop:14 }}>
+          <span onClick={onBack} style={{ cursor:'pointer', color:'rgba(255,255,255,0.85)', fontSize:12.5, fontWeight:600 }}>← Elegir otro perfil</span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, color:'rgba(255,255,255,0.65)', fontSize:12.5, marginTop:14 }}>
+          <span>Elaborado por</span>
+          <svg width="15" height="15" viewBox="0 0 100 100"><path d="M50 10C53 40 60 47 90 50C60 53 53 60 50 90C47 60 40 53 10 50C40 47 47 40 50 10Z" fill={P.accent}/></svg>
+          <b style={{ color:'#fff', fontWeight:700 }}>Rumbo</b>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [theme, setTheme] = useState('sereno');
+  const [dark, setDark] = useState(false);
+  const _dm = (typeof location!=='undefined' && (location.hash.match(/demo=(\w+)/)||[])[1]) || null;
+  const [screen, setScreen] = useState(_dm ? 'app' : 'onboarding'); // onboarding | login | app
+  const [role, setRole] = useState(_dm || null);
+  // ── Capa 2: sesión + sincronización con la nube ──
+  const [session, setSession] = useState(null);
+  const [cloudReady, setCloudReady] = useState(!CLOUD_ON);
+  useEffect(()=>{ if(!CLOUD_ON) return; sb.auth.getSession().then(({data})=>setSession(data.session)); const {data:sub}=sb.auth.onAuthStateChange((_e,s)=>setSession(s)); return ()=>sub.subscription.unsubscribe(); },[]);
+  useEffect(()=>{ if(!CLOUD_ON) return; if(!session){ setCloudReady(false); return; } let vivo=true; (async()=>{ await cloudLoad(); if(!vivo) return; setNotifs(LS.get('psico_notifs_v1', [])); setRevisiones(LS.get('psico_revisiones_v1', [])); const r=(session.user.user_metadata||{}).role||null; const _admin=((session.user.email||'').toLowerCase()===((PSICO_SUPA.evaluador||'').trim().toLowerCase())); const eff = _admin ? (role || r) : (r || role); if(eff) setRole(eff); setScreen(eff?'app':'onboarding'); setCloudReady(true); })(); return ()=>{ vivo=false; }; },[session]);
+  useEffect(()=>{ if(!CLOUD_ON||!session||!cloudReady) return; let tmr; const h=()=>{ clearTimeout(tmr); tmr=setTimeout(cloudSave,800); }; window.addEventListener('psico-cloud-dirty',h); window.addEventListener('pta-change',h); window.addEventListener('inf-change',h); return ()=>{ window.removeEventListener('psico-cloud-dirty',h); window.removeEventListener('pta-change',h); window.removeEventListener('inf-change',h); clearTimeout(tmr); }; },[session,cloudReady]);
+  const base = THEMES[theme];
+  const t = dark ? { ...base, bg:'#12161C', card:'#1B212B', ink:'#E8ECF2', muted:'#9AA6B6', border:'rgba(255,255,255,0.12)', soft:'#252D39' } : base;
+
+  // estado compartido de la demo (notificaciones, informes subidos)
+  const [notifs, setNotifs] = usePersist('psico_notifs_v1', ()=>([
+    { id:'n0', from:'Apoderado · Martín Rojas', curso:'5°B', doc:'Informe Neurología.pdf', estado:'nuevo', fecha:'Hoy 09:12' },
+    { id:'n1', from:'Apoderado · Camila Torres', curso:'5°B', doc:'Informe Psiquiatría.pdf', estado:'nuevo', fecha:'Hoy 08:50' },
+    { id:'n2', from:'Apoderado · Pedro Salas', curso:'1°A', doc:'Informe Fonoaudiología.pdf', estado:'nuevo', fecha:'Hoy 08:32' },
+    { id:'n3', from:'Apoderado · Lucía Méndez', curso:'1°A', doc:'Informe Neurología.pdf', estado:'nuevo', fecha:'Hoy 08:10' },
+    { id:'n4', from:'Apoderado · Jorge Pinto', curso:'2°C', doc:'Informe Psicología.pdf', estado:'nuevo', fecha:'Ayer 17:40' },
+    { id:'n5', from:'Apoderado · Ana Fuentes', curso:'3°A', doc:'Informe T. Ocupacional.pdf', estado:'nuevo', fecha:'Ayer 16:22' },
+    { id:'n6', from:'Apoderado · Rosa Díaz', curso:'3°A', doc:'Informe Neuropsicología.pdf', estado:'nuevo', fecha:'Ayer 15:05' },
+    { id:'n7', from:'Apoderado · Felipe Soto', curso:'4°B', doc:'Informe Psiquiatría.pdf', estado:'nuevo', fecha:'Ayer 12:18' },
+    { id:'n8', from:'Apoderado · Marta León', curso:'7°A', doc:'Informe Neurología.pdf', estado:'nuevo', fecha:'Ayer 11:02' },
+    { id:'n9', from:'Apoderado · Iván Rivas', curso:'7°A', doc:'Informe Fonoaudiología.pdf', estado:'nuevo', fecha:'Ayer 10:30' },
+    { id:'n10', from:'Apoderado · Sofía Bravo', curso:'8°D', doc:'Informe Psicología.pdf', estado:'nuevo', fecha:'Ayer 09:14' },
+    { id:'n11', from:'Apoderado · Diego Cortés', curso:'I°A', doc:'Informe Psiquiatría.pdf', estado:'nuevo', fecha:'15 jun 16:40' },
+    { id:'n12', from:'Apoderado · Paula Vega', curso:'I°A', doc:'Informe Neuropsicología.pdf', estado:'nuevo', fecha:'15 jun 15:25' },
+    { id:'n13', from:'Apoderado · Tomás Reyes', curso:'II°B', doc:'Informe Neurología.pdf', estado:'nuevo', fecha:'15 jun 13:10' },
+    { id:'n14', from:'Apoderado · Elena Muñoz', curso:'III°C', doc:'Informe Psicología.pdf', estado:'nuevo', fecha:'15 jun 11:48' },
+  ]));
+  const addInforme = useCallback((info)=> setNotifs(prev => [{ id:'n'+Date.now(), estado:'nuevo', ...info }, ...prev]), []);
+
+  // documentos enviados a revisión del apoderado (flujo de aprobación + firma)
+  const [revisiones, setRevisiones] = usePersist('psico_revisiones_v1', []);
+  const enviarRevision = useCallback((rev)=> setRevisiones(prev => {
+    const otros = prev.filter(r => !(r.estId===rev.estId && r.planId===rev.planId));
+    return [{ ...rev, id:'r'+Date.now(), estado:'en_revision', fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short'})+' '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}), obsApoderado:'', firma:null, folio:null }, ...otros];
+  }), []);
+  const aprobarFirmar = useCallback((id, firma, obs)=> setRevisiones(prev => prev.map(r => {
+    if(r.id!==id) return r;
+    const firmantes = (r.firmantes && r.firmantes.length) ? r.firmantes : ['Profesor(a) Tutor(a)','Educador(a) Diferencial','Psicóloga','Terapeuta Ocupacional','Director(a) de Ciclo'];
+    return { ...r, estado:'firmado', firma, obsApoderado:obs||r.obsApoderado, folio:'CMP-'+Math.floor(100000+Math.random()*899999), fechaFirma:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})+' · '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}), firmasInternas: firmantes.map(rol=>({ rol, firma:null, fecha:null })) };
+  })), []);
+  const firmarInterno = useCallback((id, idx, firma)=> setRevisiones(prev => prev.map(r => {
+    if(r.id!==id) return r;
+    const fi = r.firmasInternas.map((f,i)=> i===idx ? { ...f, firma, fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})+' · '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) } : f);
+    const completo = fi.every(f=>f.firma);
+    return { ...r, firmasInternas:fi, estado: completo ? 'archivado' : 'firmado' };
+  })), []);
+  const solicitarCambios = useCallback((id, comentario)=> setRevisiones(prev => prev.map(r => r.id===id ? { ...r, estado:'cambios', obsApoderado:comentario } : r)), []);
+  const responderApoderado = useCallback((id, respuesta)=> setRevisiones(prev => prev.map(r => r.id===id ? { ...r, estado:'respondido', respuestaEquipo:respuesta } : r)), []);
+
+  const go = (s)=>setScreen(s);
+  const pickRole = (r)=>{ setRole(r); setScreen('login'); };
+  const login = ()=> setScreen('app');
+  const logout = ()=>{ if(CLOUD_ON){ sb.auth.signOut(); setSession(null); setCloudReady(false); } setScreen('onboarding'); setRole(null); };
+  const [a11y, setA11y] = useState({ scale:1, contrast:false });
+
+  if(CLOUD_ON){
+    if(session && !cloudReady) return <CloudSplashPsico base={base} />;
+    if(!session && role) return <LoginCloudPsico base={base} role={role} onBack={()=>{ setRole(null); setScreen('onboarding'); }} />;
+    // sin sesión y sin rol → primero se elige el perfil (Onboarding, abajo)
+  }
+
+  return (
+    <div style={{ height:'100%', fontFamily:t.font, background:a11y.contrast?'#fff':t.bg, position:'relative', overflow:'hidden' }}>
+      <window.A11yControl a11y={a11y} setA11y={setA11y} t={t} dark={dark} setDark={setDark} />
+      {screen==='app' && role==='equipo' && <window.CopilotoIA t={t} />}
+      <div style={{ height:'100%', zoom:a11y.scale, filter:a11y.contrast?'contrast(1.22)':'none' }}>
+      {screen==='onboarding' && <window.Onboarding t={t} onPick={pickRole} />}
+      {screen==='login' && <window.Login t={t} role={role} onLogin={login} onBack={()=>go('onboarding')} />}
+      {screen==='app' && (
+        <div style={{ height:'100%', display:'flex', flexDirection:'column' }}>
+          <window.AppHeader t={t} role={role} onLogout={logout} notifCount={notifs.filter(n=>n.estado==='nuevo').length} notifs={notifs} revisiones={revisiones} />
+          <div style={{ flex:1, overflowY:'auto' }}>
+            {role==='equipo' && <window.EquipoDashboard t={t} notifs={notifs} setNotifs={setNotifs} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />}
+            {role==='profesor' && <window.ProfesorDashboard t={t} />}
+            {role==='apoderado' && <window.ApoderadoDashboard t={t} onUpload={addInforme} revisiones={revisiones} aprobarFirmar={aprobarFirmar} solicitarCambios={solicitarCambios} />}
+            {role==='gestion' && <window.GestionDashboard t={t} revisiones={revisiones} />}
+            {role==='salud' && <window.SaludDashboard t={t} />}          </div>
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}
+
+function ThemeSwitcher({ theme, setTheme, t }){
+  return (
+    <div style={{ position:'fixed', top:12, left:'50%', transform:'translateX(-50%)', zIndex:200,
+      display:'flex', gap:4, background:'rgba(20,28,45,0.9)', padding:5, borderRadius:99, boxShadow:'0 8px 30px rgba(0,0,0,0.3)', backdropFilter:'blur(8px)' }}>
+      <span style={{ color:'rgba(255,255,255,0.6)', fontSize:11, fontWeight:700, padding:'6px 10px', letterSpacing:0.5 }}>ESTILO</span>
+      {Object.entries(THEMES).map(([k,v])=>(
+        <button key={k} onClick={()=>setTheme(k)} style={{
+          border:'none', cursor:'pointer', padding:'6px 14px', borderRadius:99, fontSize:11.5, fontWeight:700,
+          background: theme===k ? v.primary : 'transparent', color: theme===k ? '#fff' : 'rgba(255,255,255,0.65)', transition:'all .2s' }}>
+          {v.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
