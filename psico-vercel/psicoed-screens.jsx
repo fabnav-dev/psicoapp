@@ -105,13 +105,14 @@ function ptaTipoColor(tipo){ return { Prueba:'#B23A24', Trabajo:'#2563B8', Guía
 
 // ─── Informe médico: existe solo cuando se carga uno real (o demo seed) ───
 const INF_KEY = 'psico_informe_v1';
-function infLoad(){ try{ return JSON.parse(localStorage.getItem(INF_KEY)||'{}'); }catch(e){ return {}; } }
-function infSave(d){ try{ localStorage.setItem(INF_KEY, JSON.stringify(d)); }catch(e){} window.dispatchEvent(new Event('inf-change')); }
+let INF_MEM = null;
+function infLoad(){ if(INF_MEM) return INF_MEM; try{ INF_MEM = JSON.parse(localStorage.getItem(INF_KEY)||'{}'); }catch(e){ INF_MEM={}; } return INF_MEM; }
+function infSave(d){ INF_MEM = d; try{ localStorage.setItem(INF_KEY, JSON.stringify(d)); }catch(e){} window.dispatchEvent(new Event('inf-change')); }
 function useInforme(){
   const [data,setData]=useState(infLoad);
-  useEffect(()=>{ const h=()=>setData(infLoad()); window.addEventListener('inf-change',h); window.addEventListener('storage',h); return ()=>{ window.removeEventListener('inf-change',h); window.removeEventListener('storage',h); }; },[]);
-  const cargar=(estId,meta)=>{ const d=infLoad(); d[estId]={ fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), origen:'Equipo', ...(meta||{}) }; infSave(d); };
-  const quitar=(estId)=>{ const d=infLoad(); delete d[estId]; infSave(d); };
+  useEffect(()=>{ const h=()=>setData(infLoad()); window.addEventListener('inf-change',h); window.addEventListener('storage',()=>{ INF_MEM=null; setData(infLoad()); }); return ()=>{ window.removeEventListener('inf-change',h); }; },[]);
+  const cargar=(estId,meta)=>{ const d={...infLoad()}; d[estId]={ fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), origen:'Equipo', ...(meta||{}) }; infSave(d); };
+  const quitar=(estId)=>{ const d={...infLoad()}; delete d[estId]; infSave(d); };
   return { data, cargar, quitar };
 }
 // Los estudiantes de demostración (seed e1..e5) traen informe cargado; los agregados manualmente, no.
