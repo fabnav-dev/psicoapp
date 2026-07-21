@@ -497,6 +497,49 @@ function nivelAlerta(s){
 
 // ─── Carga de nómina (importación masiva) ────────────────────────
 const normCurso=(c)=>String(c||'').replace(/\s*B[áa]sico|\s*Medio/i,'').replace(/\s/g,'');
+// Curso desde un título tipo "SÉPTIMO BÁSICO A" → "7°A"
+const ORD_BASE={ 'PRIMERO':'1','SEGUNDO':'2','TERCERO':'3','CUARTO':'4','QUINTO':'5','SEXTO':'6','SEPTIMO':'7','SÉPTIMO':'7','OCTAVO':'8' };
+const ORD_MEDIO={ 'PRIMERO':'I','SEGUNDO':'II','TERCERO':'III','CUARTO':'IV' };
+function cursoDesdeTitulo(txt){
+  const u=String(txt||'').toUpperCase();
+  const letra=(u.match(/\b([A-E])\b(?!.*\b[A-E]\b)/)||[])[1]||'';
+  const esMedio=/MEDIO/.test(u);
+  for(const pal of Object.keys(ORD_BASE)){
+    if(u.includes(pal)){ const num=esMedio?ORD_MEDIO[pal]:ORD_BASE[pal]; if(num) return num+'°'+letra; }
+  }
+  return null;
+}
+// Parser tolerante para la planilla real del colegio (matriz de filas del Excel)
+function parseNominaMatriz(matriz, cursoFallback){
+  const filas=(matriz||[]).map(f=>(f||[]).map(c=>String(c==null?'':c).trim()));
+  // curso: buscar en las primeras filas un título con nivel + letra
+  let curso=null;
+  for(let i=0;i<Math.min(filas.length,8);i++){ const t=filas[i].join(' '); const c=cursoDesdeTitulo(t); if(c){ curso=c; break; } }
+  if(!curso && cursoFallback){ const cf=cursoDesdeTitulo(cursoFallback)||(/^\s*(1|2|3|4|5|6|7|8|I{1,3}|IV)°?\s*[A-E]\s*$/i.test(cursoFallback)?cursoFallback.replace(/\s/g,'').replace(/°?([A-E])$/i,(m,l)=>'°'+l.toUpperCase()):null); curso=cf||cursoFallback; }
+  // fila de encabezados: la que menciona apellidos/nombres/rut
+  let hi=filas.findIndex(f=>f.some(c=>/apellido/i.test(c)) && f.some(c=>/nombre/i.test(c)));
+  if(hi<0) hi=filas.findIndex(f=>f.some(c=>/\brut\b/i.test(c)));
+  if(hi<0) return [];
+  const head=filas[hi].map(c=>c.toLowerCase());
+  const iAp=head.findIndex(c=>/apellido/.test(c));
+  const iNo=head.findIndex(c=>/nombre/.test(c));
+  const iRut=head.findIndex(c=>/rut/.test(c));
+  const out=[];
+  for(let r=hi+1;r<filas.length;r++){
+    const f=filas[r]; if(!f.length) continue;
+    const linea=f.join(' ');
+    if(/expulsi[oó]n|\bret\.?\b|retirad/i.test(linea)) continue;   // saltar retirados/expulsados
+    const ap=iAp>=0?f[iAp]:''; const no=iNo>=0?f[iNo]:'';
+    let nombre=(ap+' '+no).trim(); if(!nombre) nombre=(f[1]||'')+' '+(f[2]||'');
+    nombre=nombre.trim(); if(!nombre||/^n[°º]?$/i.test(nombre)) continue;
+    const rut=(iRut>=0?f[iRut]:f[3])||'';
+    if(!rut && !/[a-záéíóú]/i.test(nombre)) continue;
+    // NEE: alguna celda a la derecha del RUT con solo "N"
+    const nee=f.slice((iRut>=0?iRut:3)+1).some(c=>/^n$/i.test(c));
+    out.push({ id:'imp'+Date.now()+'_'+r, nombre, curso:curso||'—', rut, apoderado:'', email:'', diag:'—', plan:'—', nee, estado:'pendiente', edad:'', prof:'', avance:0 });
+  }
+  return out;
+}
 function parseNomina(text){
   const lines=String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(!lines.length) return [];
@@ -520,7 +563,26 @@ function IntakePanel({ t, mode, onAdd, onClose }){
   const [pegado,setPegado]=useState('');
   const [man,setMan]=useState({ nombre:'', curso:'', rut:'', diag:'', plan:'—', nee:true });
   const cargarTexto=(txt)=>{ const r=parseNomina(txt); setPrev(r); };
-  const onFile=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>cargarTexto(rd.result); rd.readAsText(f); };
+  const [leyendo,setLeyendo]=useState(false);
+  const cargarExcel=async(file)=>{
+    setLeyendo(true);
+    try{
+      if(!window.XLSX){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+      const buf=await file.arrayBuffer();
+      const wb=window.XLSX.read(buf,{ type:'array' });
+      let filas=[];
+      wb.SheetNames.forEach(name=>{
+        const ws=wb.Sheets[name];
+        const matriz=window.XLSX.utils.sheet_to_json(ws,{ header:1, blankrows:false, defval:'' });
+        const r=parseNominaMatriz(matriz, name);
+        if(r.length) filas=filas.concat(r);
+      });
+      if(!filas.length){ const csv=window.XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]); filas=parseNomina(csv); }
+      setPrev(filas);
+    }catch(err){ alert('No se pudo leer el Excel. Guárdalo como CSV o pega las filas en el recuadro.'); }
+    setLeyendo(false);
+  };
+  const onFile=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; if(/\.(xlsx|xls)$/i.test(f.name)||/sheet|excel/i.test(f.type)){ cargarExcel(f); } else { const rd=new FileReader(); rd.onload=()=>cargarTexto(rd.result); rd.readAsText(f); } e.target.value=''; };
   const bajarPlantilla=()=>{ const b=new Blob([NOMINA_EJEMPLO],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='plantilla-nomina.csv'; a.click(); URL.revokeObjectURL(u); };
 
   return (
@@ -535,9 +597,9 @@ function IntakePanel({ t, mode, onAdd, onClose }){
           <div style={{ fontSize:11, color:t.muted, marginBottom:12, lineHeight:1.5 }}>Sube el archivo <b>Excel/CSV</b> con la nómina del colegio. Columnas: <b>Nombre, Curso, RUT, Apoderado, Email</b>. Se cargan todos los cursos de una vez.</div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
             <label style={{ flex:'1 1 200px', cursor:'pointer', border:`1.5px dashed ${t.border}`, borderRadius:12, padding:'16px 14px', textAlign:'center', background:t.soft }}>
-              <input type="file" accept=".csv,.txt,text/csv" onChange={onFile} style={{ display:'none' }} />
+              <input type="file" accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={onFile} style={{ display:'none' }} />
               <Icon k="download" c={t.primary} s={20} />
-              <div style={{ fontSize:12, fontWeight:800, color:t.ink, marginTop:6 }}>Seleccionar archivo CSV</div>
+              <div style={{ fontSize:12, fontWeight:800, color:t.ink, marginTop:6 }}>{leyendo?'Leyendo archivo…':'Seleccionar archivo Excel o CSV'}</div>
               <div style={{ fontSize:10, color:t.muted, marginTop:2 }}>o arrastra tu planilla aquí</div>
             </label>
             <div style={{ display:'flex', flexDirection:'column', gap:7, flex:'1 1 160px' }}>
