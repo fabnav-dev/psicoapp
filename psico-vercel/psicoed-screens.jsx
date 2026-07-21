@@ -155,6 +155,32 @@ function useInforme(){
 // Los estudiantes de demostración (seed e1..e5) traen informe cargado; los agregados manualmente, no.
 function esSeedDemo(est){ return /^e\d+$/.test(String((est&&est.id)||'')); }
 
+// ─── Seguimiento NEE ─────────────────────────────────────────────
+// Un estudiante entra al "caseload" NEE cuando: (B3) tiene informe o plan/revisión,
+// o (C) el equipo lo activa manualmente. La carga masiva NO marca NEE a nadie.
+const SEG_KEY = 'psico_seg_v1';
+let SEG_MEM = null;
+function segLoad(){ if(SEG_MEM) return SEG_MEM; try{ SEG_MEM = JSON.parse(localStorage.getItem(SEG_KEY)||'{}'); }catch(e){ SEG_MEM={}; } return SEG_MEM; }
+function segSave(d){ SEG_MEM = d; try{ localStorage.setItem(SEG_KEY, JSON.stringify(d)); }catch(e){} window.dispatchEvent(new Event('seg-change')); }
+// ¿Está en seguimiento NEE? manual (si existe) manda; si no, se deriva de informe/plan/seed.
+function enSeguimiento(est, infData, revisiones, seg){
+  const id=(est&&est.id)||''; seg=seg||segLoad();
+  if(Object.prototype.hasOwnProperty.call(seg,id)) return !!seg[id];
+  if(est&&est.sinNee) return false;
+  if(infData && infData[id]) return true;
+  if(revisiones && revisiones.some(r=>r.estId===id)) return true;
+  if(esSeedDemo(est)) return true;
+  return false;
+}
+function useSeguimiento(){
+  const [seg,setSeg]=useState(segLoad);
+  useEffect(()=>{ const h=()=>setSeg({...segLoad()}); window.addEventListener('seg-change',h); return ()=>window.removeEventListener('seg-change',h); },[]);
+  const activar=(id)=>{ const d={...segLoad()}; d[id]=true; segSave(d); };
+  const quitar=(id)=>{ const d={...segLoad()}; d[id]=false; segSave(d); };
+  const reset=(id)=>{ const d={...segLoad()}; delete d[id]; segSave(d); };
+  return { seg, activar, quitar, reset };
+}
+
 // Documento oficial imprimible del Plan de trabajo académico
 function imprimirPlanAcademico(est, curso, tutor, planData){
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -658,25 +684,29 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const [extra,setExtra]=useState(()=>lsGet('psico_extra_v1',[]));      // estudiantes cargados (import + manual)
   useEffect(()=>{ lsSet('psico_extra_v1', extra); },[extra]);
   const [intake,setIntake]=useState(null);  // null | 'import' | 'manual'
+  const inf=useInforme();
+  const { seg }=useSeguimiento();
   const show=(m)=>{ setToast(m); setTimeout(()=>setToast(null),2600); };
   const roster=[...ESTUDIANTES,...extra];
   const agregarEst=(arr)=>{ setExtra(p=>[...p,...arr]); setIntake(null); show('✓ '+arr.length+' estudiante'+(arr.length!==1?'s':'')+' cargado'+(arr.length!==1?'s':'')+' a la nómina'); };
 
   if(sel) return <FichaEstudiante t={t} est={sel} onBack={()=>setSel(null)} onToast={show} toast={toast} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />;
-  if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} onBack={()=>setCurso(null)} onSel={setSel} />;
+  if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} revisiones={revisiones} onBack={()=>setCurso(null)} onSel={setSel} />;
 
   const nuevos = notifs.filter(n=>n.estado==='nuevo');
   const gestionados = notifs.filter(n=>n.estado!=='nuevo');
-  const neeCount={...NEE_POR_CURSO}; extra.forEach(e=>{ const c=normCurso(e.curso); neeCount[c]=(neeCount[c]||0)+1; });
-  const totalNEE = Object.values(NEE_POR_CURSO).reduce((a,b)=>a+b,0)+extra.length;
+  const neeCount={}; roster.forEach(e=>{ if(enSeguimiento(e,inf.data,revisiones,seg)){ const c=normCurso(e.curso); neeCount[c]=(neeCount[c]||0)+1; } });
+  const totalNEE = roster.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)).length;
+  const totalMat = roster.length;
 
   return (
     <div style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 50px' }} className="fade">
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
-        {[['Estudiantes con NEE', String(totalNEE)],['Planes vigentes','3'],['Por evaluar', String(nuevos.length||1)]].map(([l,v])=>(
+        {[['En seguimiento NEE', String(totalNEE), `de ${totalMat} matriculados`],['Planes vigentes','3',''],['Por evaluar', String(nuevos.length||1),'']].map(([l,v,sub])=>(
           <div key={l} style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'14px 16px' }}>
             <div style={{ fontFamily:t.display, fontSize:30, fontWeight:700, color:t.primary }}>{v}</div>
             <div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{l}</div>
+            {sub && <div style={{ fontSize:9.5, color:t.muted, marginTop:1, opacity:.8 }}>{sub}</div>}
           </div>
         ))}
       </div>
@@ -867,29 +897,31 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
 }
 
 // ─── ESTUDIANTES DE UN CURSO ─────────────────────────────────────
-function CursoEstudiantes({ t, curso, extra, onBack, onSel }){
+function CursoEstudiantes({ t, curso, extra, revisiones, onBack, onSel }){
   const norm=(c)=>c.replace(/\s*B[áa]sico|\s*Medio/i,'').replace(/\s/g,'');
+  const inf=useInforme(); const { seg }=useSeguimiento();
   const lista=[...ESTUDIANTES,...(extra||[])].filter(e=>norm(e.curso)===curso);
+  const enSeg=lista.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)).length;
   return (
     <div style={{ maxWidth:760, margin:'0 auto', padding:'14px 16px 50px' }} className="fade">
       <button onClick={onBack} style={{ background:'none', border:'none', color:t.muted, fontSize:12.5, cursor:'pointer', marginBottom:12, fontWeight:600 }}>← Volver a la grilla de cursos</button>
       <div style={{ fontFamily:t.display, fontSize:22, fontWeight:700, color:t.ink, marginBottom:3 }}>Curso {curso}</div>
-      <div style={{ fontSize:12, color:t.muted, marginBottom:16 }}>{lista.length} estudiante{lista.length!==1?'s':''} en la nómina del curso</div>
+      <div style={{ fontSize:12, color:t.muted, marginBottom:16 }}>{lista.length} estudiante{lista.length!==1?'s':''} en la nómina · <b style={{ color:t.primary }}>{enSeg}</b> en seguimiento NEE</div>
       {lista.length===0 ? (
         <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:30, textAlign:'center', color:t.muted, fontSize:12.5 }}>Este curso no tiene estudiantes en la nómina todavía.</div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-          {lista.map(e=>(
+          {lista.map(e=>{ const seguido=enSeguimiento(e,inf.data,revisiones,seg); return (
             <button key={e.id} onClick={()=>onSel(e)} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'13px 15px', display:'flex', alignItems:'center', gap:13, transition:'all .15s' }}
               onMouseEnter={ev=>ev.currentTarget.style.borderColor=t.primary} onMouseLeave={ev=>ev.currentTarget.style.borderColor=t.border}>
               <div style={{ width:42, height:42, borderRadius:12, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontWeight:700, color:t.primaryDark, fontFamily:t.display }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{e.sinNee?'Sin NEE · plan de trabajo académico':e.diag}</div></div>
-              {e.sinNee && <Chip t={t} label="Sin NEE" tone="soft" />}
-              {!e.sinNee && e.estado==='vigente' && <Chip t={t} label={e.plan+' gestionado'} tone="ok" />}
-              {!e.sinNee && e.estado==='borrador' && <Chip t={t} label="En elaboración" tone="warn" />}
-              {!e.sinNee && e.estado==='pendiente' && <Chip t={t} label="Con NEE · pendiente" tone="alert" />}
+              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}{e.nuevo && <span style={{ marginLeft:7, fontSize:9.5, fontWeight:800, color:t.primaryDark, background:t.soft, padding:'1px 7px', borderRadius:99 }}>NUEVO</span>}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{!seguido?'Directorio · sin seguimiento':(e.diag&&e.diag!=='—'?e.diag:'En seguimiento NEE')}</div></div>
+              {!seguido && <Chip t={t} label="Directorio" tone="soft" />}
+              {seguido && e.estado==='vigente' && <Chip t={t} label={e.plan+' gestionado'} tone="ok" />}
+              {seguido && e.estado==='borrador' && <Chip t={t} label="En elaboración" tone="warn" />}
+              {seguido && (e.estado==='pendiente'||!e.estado) && <Chip t={t} label="En seguimiento" tone="alert" />}
             </button>
-          ))}
+          ); })}
         </div>
       )}
     </div>
@@ -930,6 +962,9 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const toggleFirmante=(r)=> setFirmantesSel(p=>({...p,[r]:!p[r]}));
   const [verInforme,setVerInforme]=useState(false);
   const inf=useInforme();
+  const { seg, activar:segActivar, quitar:segQuitar }=useSeguimiento();
+  const seguido=enSeguimiento(est,inf.data,revisiones,seg);
+  const seguidoManual=Object.prototype.hasOwnProperty.call(seg,est.id);
   const tieneInforme = esSeedDemo(est) || !!(inf.data[est.id] && (inf.data[est.id].dataUrl || inf.data[est.id].path));
   const [iaSintesis,setIaSintesis]=useState(null);
   const esNEE = !est.sinNee;
@@ -1039,6 +1074,17 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
             ? <button onClick={()=>setVerInforme(true)} style={{ flexShrink:0, background:t.soft, color:t.primaryDark, border:'none', borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}><Icon k="doc" c={t.primary} s={16} />Ver informe médico</button>
             : <div title="Aún no hay informe médico cargado" style={{ flexShrink:0, background:'transparent', color:t.muted, border:`1px dashed ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}><Icon k="doc" c={t.muted} s={16} />Sin informe médico</div>)}
         </div>
+      </div>
+
+      {/* seguimiento NEE (activar/quitar manual) */}
+      <div style={{ background:seguido?t.soft:t.card, border:`1px solid ${seguido?t.primary:t.border}`, borderRadius:t.radius, padding:'11px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+        <div style={{ flex:1, minWidth:180 }}>
+          <div style={{ fontSize:12, fontWeight:800, color:seguido?t.primaryDark:t.ink }}>{seguido?'En seguimiento NEE':'En el directorio (sin seguimiento NEE)'}</div>
+          <div style={{ fontSize:10.5, color:t.muted, marginTop:2 }}>{seguido?(seguidoManual?'Activado manualmente por el equipo.':'Activo automáticamente por tener informe o plan.'):'Este estudiante no cuenta como caso NEE. Actívalo cuando el equipo inicie su seguimiento.'}</div>
+        </div>
+        {seguido
+          ? <button onClick={()=>{ segQuitar(est.id); onToast('Seguimiento NEE desactivado'); }} style={{ flexShrink:0, background:'transparent', color:t.muted, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Quitar seguimiento</button>
+          : <button onClick={()=>{ segActivar(est.id); onToast('✓ Estudiante en seguimiento NEE'); }} style={{ flexShrink:0, background:t.primary, color:'#fff', border:'none', borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Activar seguimiento NEE</button>}
       </div>
 
       {/* pestañas de la ficha */}
