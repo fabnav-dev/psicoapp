@@ -1868,13 +1868,13 @@ function ProfesorDashboard({ t }){
           <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar estudiante por nombre o diagnóstico…" style={{ width:'100%', padding:'10px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:12.5, outline:'none', marginBottom:12 }} />
           {busca.trim() ? (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {ESTUDIANTES.filter(e=> e.estado!=='pendiente' && (e.nombre+' '+e.diag).toLowerCase().includes(busca.toLowerCase())).map(e=>(
-                <button key={e.id} onClick={()=>{ setCurso(e.curso.split(' ')[0]); setOpen(e.id); setBusca(''); }} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
+              {rosterProf.filter(e=> enSeguimiento(e,inf.data,revisionesProf,seg) && (e.nombre+' '+(e.diag||'')).toLowerCase().includes(busca.toLowerCase())).map(e=>(
+                <button key={e.id} onClick={()=>{ setCurso(normCurso(e.curso)); setOpen(e.id); setBusca(''); }} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ width:38, height:38, borderRadius:11, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-                  <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:1 }}>{e.curso} · {e.diag}</div></div>
+                  <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:1 }}>{e.curso}{e.diag&&e.diag!=='—'?' · '+e.diag:''}</div></div>
                 </button>
               ))}
-              {ESTUDIANTES.filter(e=> e.estado!=='pendiente' && (e.nombre+' '+e.diag).toLowerCase().includes(busca.toLowerCase())).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:20 }}>Sin resultados.</div>}
+              {rosterProf.filter(e=> enSeguimiento(e,inf.data,revisionesProf,seg) && (e.nombre+' '+(e.diag||'')).toLowerCase().includes(busca.toLowerCase())).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:20 }}>Sin resultados.</div>}
             </div>
           ) : (
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'14px 12px' }}>
@@ -3050,7 +3050,8 @@ function SaludDashboard({ t }){
   const [abierto,setAbierto]=useState(null);
 
   const salud=useSalud(); const desreg=useDesreg();
-  const lista = ESTUDIANTES.filter(e=> salud.data[e.id] || desreg.data[e.id]).map(e=>({ e, med:(salud.data[e.id]||{}).medicamento||null, des:desreg.data[e.id]||null }));
+  const rosterSalud=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
+  const lista = rosterSalud.filter(e=> salud.data[e.id] || desreg.data[e.id]).map(e=>({ e, med:(salud.data[e.id]||{}).medicamento||null, des:desreg.data[e.id]||null }));
   const conMed = lista.filter(x=>x.med);
   const conDesreg = lista.filter(x=>x.des && x.des.nivel!=='bajo');
   const q = busca.trim().toLowerCase();
