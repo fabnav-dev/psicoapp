@@ -2366,7 +2366,27 @@ const GESTION_DOCS = [
   { id:'PAEC', nombre:'P.A.E.C.', full:'Plan de Adecuación Evaluativa', firmados:4, total:7, color:'#C2841E' },
   { id:'PSM', nombre:'Plan Salud Mental', full:'Plan Curricular Salud Mental', firmados:2, total:5, color:'#7A4FB0' },
 ];
-// vencimientos de planes (Decreto 83: vigencia anual) — demo, sin datos sensibles
+// DOCS reales por tipo de plan, desde las revisiones (firmados/total)
+function gestionDocsReales(){
+  const revis=lsGet('psico_revisiones_v1',[]);
+  const META={ PAI:{ nombre:'P.A.I.', full:'Plan de Acompañamiento Individual', color:'#2C7A6B' }, PACI:{ nombre:'P.A.C.I.', full:'Plan de Adecuación Curricular Individual', color:'#185FA5' }, PAEC:{ nombre:'P.A.E.C.', full:'Plan de Adecuación Evaluativa', color:'#C2841E' }, PSM:{ nombre:'Plan Salud Mental', full:'Plan Curricular Salud Mental', color:'#7A4FB0' } };
+  const c={ PAI:[0,0], PACI:[0,0], PAEC:[0,0], PSM:[0,0] };
+  (revis||[]).forEach(r=>{ const k=c[r.planId]?r.planId:'PAI'; c[k][1]++; if(r.estado==='firmado'||r.estado==='archivado') c[k][0]++; });
+  return Object.keys(META).map(id=>({ id, ...META[id], firmados:c[id][0], total:c[id][1] }));
+}
+// Tendencia real: % de planes firmados acumulado por mes, desde fechaFirma de las revisiones
+function gestionTendenciaReal(){
+  const revis=lsGet('psico_revisiones_v1',[]);
+  const MESES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const firmadas=(revis||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado');
+  const total=(revis||[]).length;
+  if(!total || !firmadas.length) return [];
+  const porMes={}; firmadas.forEach(r=>{ const m=(String(r.fechaFirma||'').match(/\b(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)/i)||[])[1]; if(!m) return; const idx=MESES.findIndex(x=>x.toLowerCase()===m.toLowerCase()); if(idx>=0) porMes[idx]=(porMes[idx]||0)+1; });
+  const idxs=Object.keys(porMes).map(Number).sort((a,b)=>a-b);
+  if(!idxs.length) return [];
+  let acum=0; return idxs.map(i=>{ acum+=porMes[i]; return [MESES[i], Math.round(acum/total*100)]; });
+}
+
 const GESTION_VENCE = [
   { curso:'I°A', plan:'PACI', dias:9 },
   { curso:'5°B', plan:'PAI', dias:21 },
@@ -2381,13 +2401,13 @@ function GestionDashboard({ t, revisiones }){
   const colegio = aggrega(GC);
   const enRonda = (revisiones||[]).filter(r=> r.estado==='firmado').length;
   const archivados = (revisiones||[]).filter(r=> r.estado==='archivado').length;
-  // tendencia mensual (demo)
-  const TENDENCIA = GESTION_TENDENCIA;
-  // adherencia docente por curso (demo): [confirmadas, asignaturas]
-  const ADHERENCIA = GESTION_ADHERENCIA;
-  const adhTot = Object.values(ADHERENCIA).reduce((a,[c])=>a+c,0);
-  const adhMax = Object.values(ADHERENCIA).reduce((a,[,m])=>a+m,0);
-  const adhPct = Math.round(adhTot/adhMax*100);
+  const TENDENCIA = gestionTendenciaReal();
+  const DOCS = gestionDocsReales();
+  // adherencia docente: se alimenta de las confirmaciones 'leído y aplicado' de los profesores
+  const ADHERENCIA = lsGet('psico_adh_v1', {});
+  const adhTot = Object.values(ADHERENCIA).reduce((a,v)=>a+(Array.isArray(v)?v[0]:0),0);
+  const adhMax = Object.values(ADHERENCIA).reduce((a,v)=>a+(Array.isArray(v)?v[1]:0),0);
+  const adhPct = adhMax? Math.round(adhTot/adhMax*100):0;
   const cuellos = GC.filter(r=>r.porFirmar>0).map(r=>({ ...r, dias: 10+Math.round(r.porFirmar*7) })).filter(r=>r.dias>=20).sort((a,b)=>b.dias-a.dias).slice(0,4);
 
   const Anillo=({ pct, size=92 })=>{
@@ -2415,7 +2435,7 @@ function GestionDashboard({ t, revisiones }){
       {tab==='cumplimiento' && (()=>{
         const alDia=colegio.pct>=80; const enRiesgo=colegio.pct<50;
         const estadoC=alDia?{c:'#1E7A53',bg:'#E2F3EC',lbl:'Al día'}:enRiesgo?{c:'#B23A24',bg:'#FBE6E2',lbl:'En riesgo'}:{c:'#C2841E',bg:'#FCEFD9',lbl:'Requiere atención'};
-        const paec=GESTION_DOCS.find(d=>d.id==='PAEC'); const vencidos=0;
+        const paec=DOCS.find(d=>d.id==='PAEC'); const vencidos=0;
         const items=[
           { ok:colegio.pct>=80, t:'Planes de apoyo (PAI/PACI) vigentes y firmados', d:`${colegio.firmados} de ${colegio.total} documentos firmados`, dec:'Decreto 83/2015' },
           { ok:GESTION_VENCE.length===0, t:'Sin planes vencidos', d:`${GESTION_VENCE.length} plan(es) por vencer en los próximos 30 días`, dec:'Vigencia anual' },
@@ -2556,7 +2576,7 @@ function GestionDashboard({ t, revisiones }){
 
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, margin:'18px 0 10px' }}>Avance por tipo de documento</div>
           <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-            {GESTION_DOCS.map(d=>{ const pct=d.total?Math.round(d.firmados/d.total*100):0; const tn=tono(pct); return (
+            {DOCS.map(d=>{ const pct=d.total?Math.round(d.firmados/d.total*100):0; const tn=tono(pct); return (
               <div key={d.id} style={{ background:t.card, border:`1px solid ${t.border}`, borderLeft:`4px solid ${d.color}`, borderRadius:t.radius, padding:'12px 15px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7 }}>
                   <div><div style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>{d.nombre}</div><div style={{ fontSize:10, color:t.muted }}>{d.full}</div></div>
@@ -2570,16 +2590,20 @@ function GestionDashboard({ t, revisiones }){
 
           {/* adherencia docente */}
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, margin:'18px 0 10px' }}>Adherencia docente en aula</div>
+          {adhMax===0 ? (
+            <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'16px', textAlign:'center', color:t.muted, fontSize:12 }}>Aún sin datos de adherencia. Se poblará cuando los profesores confirmen "leído y aplicado" en sus asignaturas.</div>
+          ) : (
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'14px 16px', display:'flex', alignItems:'center', gap:18 }}>
             <Anillo pct={adhPct} size={86} />
             <div style={{ flex:1 }}>
               <div style={{ fontSize:12.5, color:t.ink, fontWeight:600 }}>{adhTot} de {adhMax} asignaturas confirmaron leído y aplicado</div>
               <div style={{ fontSize:11, color:t.muted, marginTop:3 }}>Mide si los apoyos definidos están llegando realmente a las salas.</div>
-              {Object.entries(ADHERENCIA).filter(([,[c,m]])=>c/m<0.5).map(([cur,[c,m]])=>(
-                <div key={cur} style={{ fontSize:10.5, color:'#B23A24', fontWeight:600, marginTop:4 }}>{cur}: solo {c} de {m} asignaturas confirmaron</div>
+              {Object.entries(ADHERENCIA).filter(([,v])=>Array.isArray(v)&&v[1]&&v[0]/v[1]<0.5).map(([cur,v])=>(
+                <div key={cur} style={{ fontSize:10.5, color:'#B23A24', fontWeight:600, marginTop:4 }}>{cur}: solo {v[0]} de {v[1]} asignaturas confirmaron</div>
               ))}
             </div>
           </div>
+          )}
 
           {/* cuellos de botella */}
           {cuellos.length>0 && (
@@ -2638,6 +2662,9 @@ function GestionDashboard({ t, revisiones }){
         <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Tendencia del avance · mes a mes</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:14 }}>Evolución del % de documentos firmados a nivel colegio.</div>
+          {TENDENCIA.length<2 ? (
+            <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:26, textAlign:'center', color:t.muted, fontSize:12.5 }}>Aún no hay suficientes documentos firmados para mostrar una tendencia. Se irá construyendo a medida que se firmen planes.</div>
+          ) : (<React.Fragment>
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'18px 16px' }}>
             <div style={{ display:'flex', alignItems:'flex-end', gap:14, height:170 }}>
               {TENDENCIA.map(([mes,pct])=>{ const tn=tono(pct); return (
@@ -2649,9 +2676,12 @@ function GestionDashboard({ t, revisiones }){
               );})}
             </div>
           </div>
+          {TENDENCIA.length>=2 && (()=>{ const delta=TENDENCIA[TENDENCIA.length-1][1]-TENDENCIA[0][1]; return (
           <div style={{ background:'#E8F0FB', border:'1px solid #BCD4F5', borderRadius:t.radius, padding:'12px 15px', marginTop:12, fontSize:11.5, color:'#2563B8', fontWeight:600 }}>
-            ↗ +21 puntos desde marzo. El avance crece de forma sostenida.
+            ↗ {delta>=0?'+':''}{delta} puntos entre {TENDENCIA[0][0]} y {TENDENCIA[TENDENCIA.length-1][0]}.
           </div>
+          ); })()}
+          </React.Fragment>)}
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, margin:'18px 0 10px' }}>Comparativa entre ciclos</div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {CICLOS_GESTION.map(c=>{ const ag=aggrega(GC.filter(r=>r.ciclo===c.id)); const tn=tono(ag.pct); return (
@@ -2728,13 +2758,16 @@ function exportarExcel(){
 // informe de gestión imprimible
 function imprimirGestion(colegio){
   const GC_EXP=gestionRowsReales();
+  const DOCS_EXP=gestionDocsReales();
+  const TEND_EXP=gestionTendenciaReal();
+  const ADH_EXP=lsGet('psico_adh_v1', {});
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const tn=(pct)=>pct>=80?'#1E7A53':pct>=50?'#2563B8':'#B23A24';
   const ciclosHTML=CICLOS_GESTION.map(c=>{ const ag=aggrega(GC_EXP.filter(r=>r.ciclo===c.id));
     return `<tr><td><b>${esc(c.nombre)}</b><br><span style="color:#666;font-size:9px">${esc(c.rango)}</span></td><td style="text-align:center">${ag.nee}</td><td style="text-align:center">${ag.firmados}</td><td style="text-align:center">${ag.porFirmar}</td><td style="text-align:center;color:${tn(ag.pct)};font-weight:700">${ag.pct}%</td></tr>`; }).join('');
   const cursosHTML=GC_EXP.map(r=>{ const tot=r.firmados+r.porFirmar; const p=tot?Math.round(r.firmados/tot*100):0;
     return `<tr><td>${esc(r.curso)}</td><td style="text-align:center">${r.nee}</td><td style="text-align:center">${r.firmados}/${tot}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('');
-  const docsHTML=GESTION_DOCS.map(d=>{ const p=d.total?Math.round(d.firmados/d.total*100):0;
+  const docsHTML=DOCS_EXP.map(d=>{ const p=d.total?Math.round(d.firmados/d.total*100):0;
     return `<tr><td><b>${esc(d.nombre)}</b><br><span style="color:#666;font-size:9px">${esc(d.full)}</span></td><td style="text-align:center">${d.firmados}/${d.total}</td><td style="text-align:center">${d.total-d.firmados}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('');
   const w=window.open('','_blank');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Gestión · App Psicoeducativa</title>
@@ -2768,9 +2801,9 @@ function imprimirGestion(colegio){
   <h2>Detalle por curso</h2>
   <table><thead><tr><th>Curso</th><th style="text-align:center">NEE</th><th style="text-align:center">Firmados</th><th style="text-align:center">Avance</th></tr></thead><tbody>${cursosHTML}</tbody></table>
   <h2>Tendencia del avance · mes a mes</h2>
-  <table><thead><tr>${GESTION_TENDENCIA.map(([m])=>`<th style="text-align:center">${m}</th>`).join('')}</tr></thead><tbody><tr>${GESTION_TENDENCIA.map(([,p])=>`<td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td>`).join('')}</tr></tbody></table>
+  <table><thead><tr>${(TEND_EXP.length<2?[['—','']]:TEND_EXP).map(([m])=>`<th style="text-align:center">${m}</th>`).join('')}</tr></thead><tbody><tr>${(TEND_EXP.length<2?[['—','sin datos']]:TEND_EXP).map(([,p])=>`<td style="text-align:center;color:${tn(p||0)};font-weight:700">${TEND_EXP.length<2?'—':p+'%'}</td>`).join('')}</tr></tbody></table>
   <h2>Adherencia docente en aula</h2>
-  <table><thead><tr><th>Curso</th><th style="text-align:center">Asignaturas que confirmaron</th><th style="text-align:center">Adherencia</th></tr></thead><tbody>${Object.entries(GESTION_ADHERENCIA).map(([cur,[c,m]])=>{ const p=Math.round(c/m*100); return `<tr><td>${esc(cur)}</td><td style="text-align:center">${c} de ${m}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('')}</tbody></table>
+  <table><thead><tr><th>Curso</th><th style="text-align:center">Asignaturas que confirmaron</th><th style="text-align:center">Adherencia</th></tr></thead><tbody>${Object.keys(ADH_EXP).length===0?`<tr><td colspan="3" style="text-align:center;color:#666">Aún sin datos de adherencia docente</td></tr>`:Object.entries(ADH_EXP).map(([cur,v])=>{ const c=Array.isArray(v)?v[0]:0, m=Array.isArray(v)?v[1]:0; const p=m?Math.round(c/m*100):0; return `<tr><td>${esc(cur)}</td><td style="text-align:center">${c} de ${m}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('')}</tbody></table>
   <h2>Cumplimiento normativo</h2>
   <table><thead><tr><th>Indicador</th><th style="text-align:center">Cumplimiento</th></tr></thead><tbody>${[['Decreto 83/2015 · Diversificación de la enseñanza',92],['Decreto 67/2018 · Evaluación y promoción',88],['Planes con revisión vigente (al día)',74]].map(([l,p])=>`<tr><td>${esc(l)}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`).join('')}</tbody></table>
   <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
@@ -3076,7 +3109,10 @@ function SaludDashboard({ t }){
 
   const salud=useSalud(); const desreg=useDesreg();
   const rosterSalud=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
-  const lista = rosterSalud.filter(e=> salud.data[e.id] || desreg.data[e.id]).map(e=>({ e, med:(salud.data[e.id]||{}).medicamento||null, des:desreg.data[e.id]||null }));
+  const [nuevos,setNuevos]=useState([]);
+  const [addBusca,setAddBusca]=useState('');
+  const [agregando,setAgregando]=useState(false);
+  const lista = rosterSalud.filter(e=> salud.data[e.id] || desreg.data[e.id] || nuevos.includes(e.id)).map(e=>({ e, med:(salud.data[e.id]||{}).medicamento||null, des:desreg.data[e.id]||null }));
   const conMed = lista.filter(x=>x.med);
   const conDesreg = lista.filter(x=>x.des && x.des.nivel!=='bajo');
   const q = busca.trim().toLowerCase();
@@ -3118,6 +3154,32 @@ function SaludDashboard({ t }){
 
       {tab==='estudiantes' && (
         <div className="fade">
+          {/* Alta de registro para cualquier alumno del roster */}
+          <div style={{ marginBottom:12 }}>
+            {!agregando ? (
+              <button onClick={()=>setAgregando(true)} style={{ width:'100%', padding:'11px 14px', background:t.card, color:t.primaryDark, border:`1.5px dashed ${t.primary}`, borderRadius:11, fontSize:12.5, fontWeight:700, cursor:'pointer' }}>＋ Agregar registro de salud a un estudiante</button>
+            ) : (
+              <div style={{ background:t.card, border:`1px solid ${t.primary}`, borderRadius:t.radius, padding:14 }} className="slide">
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                  <div style={{ fontSize:12.5, fontWeight:800, color:t.ink }}>Buscar estudiante en la nómina</div>
+                  <button onClick={()=>{ setAgregando(false); setAddBusca(''); }} style={{ background:'none', border:'none', fontSize:16, color:t.muted, cursor:'pointer' }}>✕</button>
+                </div>
+                <input value={addBusca} onChange={e=>setAddBusca(e.target.value)} placeholder="Nombre o curso…" style={{ width:'100%', padding:'10px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', marginBottom:10, background:t.card, color:t.ink }} />
+                {addBusca.trim() ? (
+                  <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:260, overflowY:'auto' }}>
+                    {rosterSalud.filter(e=> !(salud.data[e.id]||desreg.data[e.id]||nuevos.includes(e.id)) && (e.nombre+' '+e.curso).toLowerCase().includes(addBusca.trim().toLowerCase())).slice(0,30).map(e=>(
+                      <button key={e.id} onClick={()=>{ setNuevos(p=>[...p,e.id]); setAbierto(e.id); setAgregando(false); setAddBusca(''); }} style={{ textAlign:'left', cursor:'pointer', background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:11 }}>
+                        <div style={{ width:36, height:36, borderRadius:10, background:t.card, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0, fontSize:12 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+                        <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}</div></div>
+                        <span style={{ flexShrink:0, color:t.primary, fontSize:12, fontWeight:800 }}>＋</span>
+                      </button>
+                    ))}
+                    {rosterSalud.filter(e=> !(salud.data[e.id]||desreg.data[e.id]||nuevos.includes(e.id)) && (e.nombre+' '+e.curso).toLowerCase().includes(addBusca.trim().toLowerCase())).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:16 }}>Sin resultados en la nómina.</div>}
+                  </div>
+                ) : <div style={{ textAlign:'center', color:t.muted, fontSize:11.5, padding:12 }}>Escribe para buscar en la nómina cargada.</div>}
+              </div>
+            )}
+          </div>
           <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar por nombre o curso…" style={{ width:'100%', padding:'10px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', marginBottom:10, background:t.card, color:t.ink }} />
           <div style={{ display:'flex', gap:7, marginBottom:14, flexWrap:'wrap' }}>
             {[['todos','Todos'],['medicamento','Toman medicamento'],['desregulacion','Con protocolo']].map(([id,label])=>(
