@@ -890,10 +890,11 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const adecSet = planId==='PAEC' ? ADEC_EVAL : planId==='PSM' ? ADEC_PSM : ADEC_ACCESO;
   // Publica el estudiante abierto para que el Copiloto IA tenga contexto
   useEffect(()=>{
-    window.__psicoStudentCtx = { nombre:est.nombre, curso:est.curso, diag:est.diag||'', plan:(plan&&plan.full)||'', planNombre:(plan&&plan.nombre)||'', resumen:(iaSintesis&&iaSintesis.resumen)||'', adec:(adecSet||[]).map(g=>({ tipo:g.tipo, items:g.items })) };
+    const _rec = inf.data[est.id] || null;
+    window.__psicoStudentCtx = { estId:est.id, nombre:est.nombre, curso:est.curso, diag:est.diag||'', plan:(plan&&plan.full)||'', planNombre:(plan&&plan.nombre)||'', resumen:(iaSintesis&&iaSintesis.resumen)||'', adec:(adecSet||[]).map(g=>({ tipo:g.tipo, items:g.items })), informe:(esSeedDemo(est)||_rec)?{ nombre:(_rec&&_rec.nombre)||'Informe médico', tieneArchivo:!!(_rec&&(_rec.dataUrl||_rec.path)), rec:_rec, demo:esSeedDemo(est) }:null };
     window.dispatchEvent(new Event('psico-student'));
     return ()=>{ window.__psicoStudentCtx=null; window.dispatchEvent(new Event('psico-student')); };
-  }, [est.id, planId, iaSintesis]);
+  }, [est.id, planId, iaSintesis, inf.data]);
 
   function seedMarcas(){ const m={}; (planId==='PAEC'?ADEC_EVAL:planId==='PSM'?ADEC_PSM:ADEC_ACCESO).forEach((g,gi)=>g.items.forEach((it,ii)=>{ if((gi+ii)%2===0) m[gi+'-'+ii]=true; })); return m; }
 
@@ -2688,19 +2689,38 @@ function CopilotoIA({ t }){
 
   const ctx = `Eres un asistente psicoeducativo experto del Colegio Mayor Peñalolén (Chile). Ayudas al equipo (educadoras diferenciales, psicólogas, terapeutas ocupacionales) con estudiantes con NEE. Conoces los documentos PAI, PACI, PAEC y Plan de Salud Mental, y la normativa chilena (Decreto 83/2015, Decreto 67/2018). Responde en español, conciso, práctico y cálido.\n\nFORMATO DE RESPUESTA: escribe en texto plano y limpio. NO uses markdown (nada de ###, **, ni líneas ---) ni emojis. Usa títulos en MAYÚSCULAS y listas con guion simple. Cuando te pidan completar o sugerir adecuaciones de un plan (PAI/PACI/PAEC/PSM), responde SIEMPRE usando las secciones y los ítems EXACTOS del plan abierto que se listan más abajo, agrupados por su sección, e indica para cada uno si conviene MARCARLO o no según el diagnóstico. No inventes ítems que no estén en esa lista, y NO agregues categorías propias (como "Ubicación", "Ambiente", "Tiempos"): usa únicamente los nombres de sección e ítems textuales del plan.`;
   const ctxPlan = (alumno && alumno.adec && alumno.adec.length) ? `\n\nESTRUCTURA EXACTA DEL PLAN ABIERTO (${alumno.planNombre||alumno.plan}). Usa estas secciones e ítems textuales al sugerir adecuaciones:\n`+alumno.adec.map(g=>`• ${g.tipo}\n`+g.items.map(it=>`   - ${it}`).join('\n')).join('\n') : '';
-  const ctxAlumno = alumno ? `\n\nESTUDIANTE ACTUALMENTE ABIERTO EN PANTALLA: ${alumno.nombre} (curso ${alumno.curso}${alumno.diag?', diagnóstico '+alumno.diag:''}).${alumno.plan?' Documento abierto: '+alumno.plan+'.':''}${alumno.resumen?' Síntesis del informe: '+alumno.resumen:''}\nSi el usuario pregunta por "este estudiante", "el/la estudiante" o no nombra a nadie, se refiere a ${alumno.nombre}. Basa tus respuestas en este estudiante salvo que el usuario nombre a otro.`+ctxPlan : `\n\nNo hay ninguna ficha de estudiante abierta en este momento. Si el usuario pregunta por un estudiante específico, pídele que abra su ficha primero.`;
+  const ctxInforme = alumno && alumno.informe ? (alumno.informe.tieneArchivo ? `\n\nINFORME MÉDICO: el estudiante tiene cargado el informe del especialista ("${alumno.informe.nombre}"). Cuando el usuario te pida leerlo o basar tus sugerencias en él, el archivo se adjunta a este mensaje (imagen o PDF) para que lo leas directamente. NUNCA respondas que no tienes acceso a archivos: si en este mensaje viene un archivo adjunto, léelo; si el usuario aún no lo ha pedido, ofrécele leerlo.` : `\n\nINFORME MÉDICO: figura un informe registrado pero sin archivo legible adjunto; pide al usuario que lo vuelva a subir desde la ficha si necesitas su contenido.`) : `\n\nINFORME MÉDICO: este estudiante aún no tiene informe del especialista cargado. Si te piden adecuaciones basadas en el diagnóstico, indícale que primero suba el informe en la ficha (o que te describa el diagnóstico).`;
+  const ctxAlumno = alumno ? `\n\nESTUDIANTE ACTUALMENTE ABIERTO EN PANTALLA: ${alumno.nombre} (curso ${alumno.curso}${alumno.diag?', diagnóstico '+alumno.diag:''}).${alumno.plan?' Documento abierto: '+alumno.plan+'.':''}${alumno.resumen?' Síntesis del informe: '+alumno.resumen:''}\nSi el usuario pregunta por "este estudiante", "el/la estudiante" o no nombra a nadie, se refiere a ${alumno.nombre}. Basa tus respuestas en este estudiante salvo que el usuario nombre a otro.`+ctxInforme+ctxPlan : `\n\nNo hay ninguna ficha de estudiante abierta en este momento. Si el usuario pregunta por un estudiante específico, pídele que abra su ficha primero.`;
   const sugerencias = alumno
     ? [`Redacta 3 objetivos para ${alumno.nombre}`, `Sugiere adecuaciones para ${alumno.nombre}`, `Resume el caso de ${alumno.nombre}`]
     : ['Sugiere adecuaciones para un estudiante con TDAH','¿Qué casos debería priorizar esta semana?','¿Qué diferencia hay entre PAI y PACI?'];
 
+  const [adjuntado,setAdjuntado]=useState(false);
+  useEffect(()=>{ setAdjuntado(false); },[alumno&&alumno.estId]);
   const enviar=async(texto)=>{
     const q=(texto||input).trim(); if(!q||cargando) return;
     setInput(''); setMsgs(m=>[...m,{ rol:'user', txt:q }]); setCargando(true);
     try{
       const hist=msgs.slice(-6).map(m=>`${m.rol==='user'?'Usuario':'Asistente'}: ${m.txt}`).join('\n');
-      const r=await window.claude.complete({ messages:[{ role:'user', content:`${ctx}${ctxAlumno}\n\nConversación previa:\n${hist}\n\nUsuario: ${q}\n\nAsistente:` }] });
+      const prompt=`${ctx}${ctxAlumno}\n\nConversación previa:\n${hist}\n\nUsuario: ${q}\n\nAsistente:`;
+      // Adjunta el archivo real del informe médico si está disponible y aún no se envió
+      let bloques=null;
+      if(alumno && alumno.informe && alumno.informe.tieneArchivo && alumno.informe.rec && !adjuntado){
+        try{
+          const du=await informeDataUrl(alumno.informe.rec);
+          const mm=/^data:([^;]+);base64,(.*)$/.exec(du||'');
+          if(mm){
+            const media=mm[1], datos=mm[2];
+            const esPdf=/pdf/i.test(media);
+            bloques=[{ type:'text', text:prompt+`\n\n(Se adjunta el informe médico de ${alumno.nombre} para que lo leas directamente.)` }, esPdf ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:datos } } : { type:'image', source:{ type:'base64', media_type:media, data:datos } }];
+            setAdjuntado(true);
+          }
+        }catch(_){}
+      }
+      const content = bloques || prompt;
+      const r=await window.claude.complete({ messages:[{ role:'user', content }] });
       setMsgs(m=>[...m,{ rol:'ia', txt:(r||'').trim()||'No pude generar respuesta, intenta de nuevo.' }]);
-    }catch(e){ setMsgs(m=>[...m,{ rol:'ia', txt:'La IA está recibiendo muchas consultas en este momento. Espera unos segundos y vuelve a intentarlo.' }]); }
+    }catch(e){ setMsgs(m=>[...m,{ rol:'ia', txt:'La IA está ocupada en este momento. Espera unos segundos y vuelve a intentarlo.' }]); }
     setCargando(false);
   };
 
