@@ -681,6 +681,8 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const [tab,setTab]=useState('cursos');    // cursos | bandeja
   const [busca,setBusca]=useState('');
   const [toast,setToast]=useState(null);
+  const [vaciarModal,setVaciarModal]=useState(false);
+  const [vaciarTxt,setVaciarTxt]=useState('');
   const [extra,setExtra]=useState(()=>lsGet('psico_extra_v1',[]));      // estudiantes cargados (import + manual)
   useEffect(()=>{ lsSet('psico_extra_v1', extra); },[extra]);
   const [intake,setIntake]=useState(null);  // null | 'import' | 'manual'
@@ -689,7 +691,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const show=(m)=>{ setToast(m); setTimeout(()=>setToast(null),2600); };
   const roster=[...ESTUDIANTES,...extra];
   const agregarEst=(arr)=>{ setExtra(p=>{ const ruts=new Set(arr.map(e=>(e.rut||'').replace(/\s/g,'').toLowerCase()).filter(Boolean)); const base=p.filter(e=>!(e.rut&&ruts.has((e.rut||'').replace(/\s/g,'').toLowerCase()))); return [...base,...arr]; }); setIntake(null); show('✓ '+arr.length+' estudiante'+(arr.length!==1?'s':'')+' cargado'+(arr.length!==1?'s':'')+' a la nómina'); };
-  const vaciarNomina=()=>{ const r=window.prompt('Esta acción borra TODA la nómina cargada (los datos de demostración se mantienen). Para confirmar, escribe la palabra BORRAR:'); if(r===null) return; if(r.trim().toUpperCase()==='BORRAR'){ setExtra([]); show('Nómina cargada vaciada'); } else { show('Cancelado: no se escribió BORRAR'); } };
+  const vaciarNomina=()=>{ setVaciarTxt(''); setVaciarModal(true); };
 
   if(sel) return <FichaEstudiante t={t} est={sel} onBack={()=>setSel(null)} onToast={show} toast={toast} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />;
   if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} revisiones={revisiones} onBack={()=>setCurso(null)} onSel={setSel} />;
@@ -894,6 +896,21 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
         </div>
       )}
       <Toast t={t} msg={toast} />
+      {vaciarModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(20,30,26,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:400, padding:20 }} onClick={()=>setVaciarModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:16, maxWidth:420, width:'100%', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }} className="scale">
+            <div style={{ background:'#B23A24', color:'#fff', padding:'14px 18px', display:'flex', alignItems:'center', gap:10, fontSize:15, fontWeight:800 }}><span style={{ fontSize:18 }}>⚠️</span>¡CUIDADO!</div>
+            <div style={{ padding:'18px 18px 20px' }}>
+              <div style={{ fontSize:12.5, color:t.ink, lineHeight:1.5, marginBottom:14 }}>Esta acción borra <b>TODA la nómina cargada</b> (los datos de demostración se mantienen). Para confirmar, escribe la palabra <b>BORRAR</b>:</div>
+              <input autoFocus value={vaciarTxt} onChange={e=>setVaciarTxt(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && vaciarTxt.trim().toUpperCase()==='BORRAR'){ setExtra([]); setVaciarModal(false); show('Nómina cargada vaciada'); } }} placeholder="BORRAR" style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:14, fontWeight:700, letterSpacing:1, outline:'none', textAlign:'center', color:t.ink }} />
+              <div style={{ display:'flex', gap:9, marginTop:16 }}>
+                <button onClick={()=>setVaciarModal(false)} style={{ flex:1, padding:11, background:t.soft, color:t.muted, border:'none', borderRadius:11, fontSize:12.5, fontWeight:700, cursor:'pointer' }}>Cancelar</button>
+                <button disabled={vaciarTxt.trim().toUpperCase()!=='BORRAR'} onClick={()=>{ setExtra([]); setVaciarModal(false); show('Nómina cargada vaciada'); }} style={{ flex:1.3, padding:11, background:vaciarTxt.trim().toUpperCase()==='BORRAR'?'#B23A24':t.soft, color:vaciarTxt.trim().toUpperCase()==='BORRAR'?'#fff':t.muted, border:'none', borderRadius:11, fontSize:12.5, fontWeight:700, cursor:vaciarTxt.trim().toUpperCase()==='BORRAR'?'pointer':'default' }}>Vaciar nómina</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
