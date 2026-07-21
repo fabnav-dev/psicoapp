@@ -54,7 +54,7 @@ const sb = CLOUD_ON ? window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.an
 window.PSICO_SB = sb; // expuesto para subir/leer informes desde Storage (bucket "informes")
 const WORKSPACE = PSICO_SUPA.workspace || 'colegio';
 // Todas las claves de datos que ya guarda la capa 1 en localStorage
-const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1'];
+const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1','psico_seg_v1','psico_salud_v1','psico_desreg_v1'];
 const ROLES = [
   { id:'equipo',    label:'Equipo Psicoeducativo' },
   { id:'profesor',  label:'Profesor(a)' },
