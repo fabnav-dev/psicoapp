@@ -1826,7 +1826,13 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
 // ════════════════ PROFESOR ══════════════════════════════════════
 function ProfesorDashboard({ t }){
   const [curso,setCurso]=useState(null);   // null = grilla; si no, código tipo '5°B'
-  const conApoyo=ESTUDIANTES.filter(e=>curso && e.curso.startsWith(curso) && e.estado!=='pendiente');
+  const inf=useInforme();
+  const { seg }=useSeguimiento();
+  const extraProf=lsGet('psico_extra_v1',[]);
+  const revisionesProf=lsGet('psico_revisiones_v1',[]);
+  const rosterProf=[...ESTUDIANTES,...extraProf];
+  const conApoyo=rosterProf.filter(e=>curso && normCurso(e.curso)===curso && enSeguimiento(e,inf.data,revisionesProf,seg));
+  const neeCountProf={}; rosterProf.forEach(e=>{ if(enSeguimiento(e,inf.data,revisionesProf,seg)){ const c=normCurso(e.curso); neeCountProf[c]=(neeCountProf[c]||0)+1; } });
   const [open,setOpen]=useState(null);
   const [busca,setBusca]=useState('');
   const [leidos,setLeidos]=useState({});        // {`estId::Asignatura`: fechaConfirmación}
@@ -1880,7 +1886,7 @@ function ProfesorDashboard({ t }){
                   <div style={{ fontSize:10, fontWeight:700, color:t.ink, textAlign:'right', paddingRight:4 }}>{n}</div>
                   {CURSO_GRID.letras.map(l=>{
                     if(l==='E' && (n==='III°'||n==='IV°')) return <div key={l}></div>;
-                    const code=n+l; const nee=NEE_POR_CURSO[code]||0;
+                    const code=n+l; const nee=neeCountProf[code]||0;
                     return (
                       <button key={l} onClick={()=>{ setCurso(code); setOpen(null); }} style={{ position:'relative', height:38, borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
                         border:`1px solid ${nee?t.primary:t.border}`, background:nee?t.primary:t.card, color:nee?'#fff':t.muted, transition:'all .15s' }}>
