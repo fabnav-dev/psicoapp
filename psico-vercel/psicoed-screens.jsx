@@ -2328,6 +2328,19 @@ const GESTION_CURSOS = [
   { curso:'III°C', ciclo:'c3', nee:1, firmados:1, porFirmar:0 },
   { curso:'IV°A', ciclo:'c3', nee:2, firmados:1, porFirmar:1 },
 ];
+// Filas de Gestión derivadas del ROSTER REAL (caseload + revisiones), no demo.
+function cicloDeCurso(code){ const g=String(code||'').replace(/[A-E]$/,''); if(['PK','K','1°','2°'].includes(g)) return 'c1'; if(['3°','4°','5°','6°'].includes(g)) return 'c2'; return 'c3'; }
+function gestionRowsReales(){
+  const extra=lsGet('psico_extra_v1',[]);
+  const revis=lsGet('psico_revisiones_v1',[]);
+  const roster=[...ESTUDIANTES,...extra];
+  const infD=infLoad(), segD=segLoad();
+  const cursoDe={}; roster.forEach(e=>{ cursoDe[e.id]=normCurso(e.curso); });
+  const nee={}, firmSet={};
+  roster.forEach(e=>{ if(enSeguimiento(e,infD,revis,segD)){ const c=normCurso(e.curso); nee[c]=(nee[c]||0)+1; } });
+  (revis||[]).forEach(r=>{ const c=cursoDe[r.estId]; if(!c) return; if(r.estado==='firmado'||r.estado==='archivado'){ firmSet[c]=firmSet[c]||new Set(); firmSet[c].add(r.estId); } });
+  return Object.keys(nee).sort().map(c=>{ const f=firmSet[c]?firmSet[c].size:0; return { curso:c, ciclo:cicloDeCurso(c), nee:nee[c], firmados:f, porFirmar:Math.max(0,nee[c]-f) }; });
+}
 function aggrega(rows){
   const nee=rows.reduce((a,r)=>a+r.nee,0), f=rows.reduce((a,r)=>a+r.firmados,0), p=rows.reduce((a,r)=>a+r.porFirmar,0);
   const total=f+p; const pct= total? Math.round(f/total*100):0;
@@ -2355,7 +2368,8 @@ const AHORRO = { horasPorDoc:3.5, valorHora:14000, docsSemana:6, docsMes:23, doc
 
 function GestionDashboard({ t, revisiones }){
   const [tab,setTab]=useState('resumen'); // resumen | tendencia | ciclos | cursos
-  const colegio = aggrega(GESTION_CURSOS);
+  const GC = gestionRowsReales();
+  const colegio = aggrega(GC);
   const enRonda = (revisiones||[]).filter(r=> r.estado==='firmado').length;
   const archivados = (revisiones||[]).filter(r=> r.estado==='archivado').length;
   // tendencia mensual (demo)
@@ -2365,7 +2379,7 @@ function GestionDashboard({ t, revisiones }){
   const adhTot = Object.values(ADHERENCIA).reduce((a,[c])=>a+c,0);
   const adhMax = Object.values(ADHERENCIA).reduce((a,[,m])=>a+m,0);
   const adhPct = Math.round(adhTot/adhMax*100);
-  const cuellos = GESTION_CURSOS.filter(r=>r.porFirmar>0).map(r=>({ ...r, dias: 10+Math.round(r.porFirmar*7) })).filter(r=>r.dias>=20).sort((a,b)=>b.dias-a.dias).slice(0,4);
+  const cuellos = GC.filter(r=>r.porFirmar>0).map(r=>({ ...r, dias: 10+Math.round(r.porFirmar*7) })).filter(r=>r.dias>=20).sort((a,b)=>b.dias-a.dias).slice(0,4);
 
   const Anillo=({ pct, size=92 })=>{
     const tn=tono(pct); const r=(size-12)/2; const circ=2*Math.PI*r;
@@ -2508,7 +2522,7 @@ function GestionDashboard({ t, revisiones }){
           </div>
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:10 }}>Avance por ciclo</div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {CICLOS_GESTION.map(c=>{ const ag=aggrega(GESTION_CURSOS.filter(r=>r.ciclo===c.id)); const tn=tono(ag.pct); return (
+            {CICLOS_GESTION.map(c=>{ const ag=aggrega(GC.filter(r=>r.ciclo===c.id)); const tn=tono(ag.pct); return (
               <div key={c.id} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'13px 16px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                   <div><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{c.nombre}</div><div style={{ fontSize:10.5, color:t.muted }}>{c.rango}</div></div>
@@ -2631,7 +2645,7 @@ function GestionDashboard({ t, revisiones }){
           </div>
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, margin:'18px 0 10px' }}>Comparativa entre ciclos</div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {CICLOS_GESTION.map(c=>{ const ag=aggrega(GESTION_CURSOS.filter(r=>r.ciclo===c.id)); const tn=tono(ag.pct); return (
+            {CICLOS_GESTION.map(c=>{ const ag=aggrega(GC.filter(r=>r.ciclo===c.id)); const tn=tono(ag.pct); return (
               <div key={c.id} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'12px 15px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:7 }}><span style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>{c.nombre}</span><span style={{ color:tn.c, fontWeight:800, fontSize:12.5 }}>{ag.pct}%</span></div>
                 <Barra pct={ag.pct} />
@@ -2642,7 +2656,7 @@ function GestionDashboard({ t, revisiones }){
       )}
       {tab==='ciclos' && (
         <div className="fade" id="gestion-print">
-          {CICLOS_GESTION.map(c=>{ const rows=GESTION_CURSOS.filter(r=>r.ciclo===c.id); const ag=aggrega(rows); const tn=tono(ag.pct); return (
+          {CICLOS_GESTION.map(c=>{ const rows=GC.filter(r=>r.ciclo===c.id); const ag=aggrega(rows); const tn=tono(ag.pct); return (
             <div key={c.id} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:16, marginBottom:14 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                 <div><div style={{ fontFamily:t.display, fontSize:16, fontWeight:700, color:t.ink }}>{c.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{c.rango}</div></div>
@@ -2667,7 +2681,7 @@ function GestionDashboard({ t, revisiones }){
             <div style={{ display:'grid', gridTemplateColumns:'1fr 60px 60px 64px', gap:0, background:t.soft, padding:'10px 14px', fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.4 }}>
               <div>Curso</div><div style={{ textAlign:'center' }}>NEE</div><div style={{ textAlign:'center' }}>Firm.</div><div style={{ textAlign:'right' }}>Avance</div>
             </div>
-            {GESTION_CURSOS.map((r,i)=>{ const tot=r.firmados+r.porFirmar; const p=tot?Math.round(r.firmados/tot*100):0; const tn=tono(p); return (
+            {GC.map((r,i)=>{ const tot=r.firmados+r.porFirmar; const p=tot?Math.round(r.firmados/tot*100):0; const tn=tono(p); return (
               <div key={r.curso} style={{ display:'grid', gridTemplateColumns:'1fr 60px 60px 64px', gap:0, padding:'10px 14px', borderTop:`1px solid ${t.border}`, alignItems:'center', fontSize:12 }}>
                 <div style={{ fontWeight:700, color:t.ink }}>{r.curso}</div>
                 <div style={{ textAlign:'center', color:t.muted }}>{r.nee}</div>
@@ -2693,8 +2707,9 @@ function GestionDashboard({ t, revisiones }){
 
 // exporta a Excel (CSV con BOM, lo abre Excel directamente)
 function exportarExcel(){
+  const GC_EXP=gestionRowsReales();
   const filas=[['Curso','Estudiantes NEE','Firmados','Por firmar','Avance %']];
-  GESTION_CURSOS.forEach(r=>{ const tot=r.firmados+r.porFirmar; filas.push([r.curso, r.nee, r.firmados, r.porFirmar, tot?Math.round(r.firmados/tot*100):0]); });
+  GC_EXP.forEach(r=>{ const tot=r.firmados+r.porFirmar; filas.push([r.curso, r.nee, r.firmados, r.porFirmar, tot?Math.round(r.firmados/tot*100):0]); });
   const csv='\uFEFF'+filas.map(f=>f.join(';')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -2703,11 +2718,12 @@ function exportarExcel(){
 
 // informe de gestión imprimible
 function imprimirGestion(colegio){
+  const GC_EXP=gestionRowsReales();
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const tn=(pct)=>pct>=80?'#1E7A53':pct>=50?'#2563B8':'#B23A24';
-  const ciclosHTML=CICLOS_GESTION.map(c=>{ const ag=aggrega(GESTION_CURSOS.filter(r=>r.ciclo===c.id));
+  const ciclosHTML=CICLOS_GESTION.map(c=>{ const ag=aggrega(GC_EXP.filter(r=>r.ciclo===c.id));
     return `<tr><td><b>${esc(c.nombre)}</b><br><span style="color:#666;font-size:9px">${esc(c.rango)}</span></td><td style="text-align:center">${ag.nee}</td><td style="text-align:center">${ag.firmados}</td><td style="text-align:center">${ag.porFirmar}</td><td style="text-align:center;color:${tn(ag.pct)};font-weight:700">${ag.pct}%</td></tr>`; }).join('');
-  const cursosHTML=GESTION_CURSOS.map(r=>{ const tot=r.firmados+r.porFirmar; const p=tot?Math.round(r.firmados/tot*100):0;
+  const cursosHTML=GC_EXP.map(r=>{ const tot=r.firmados+r.porFirmar; const p=tot?Math.round(r.firmados/tot*100):0;
     return `<tr><td>${esc(r.curso)}</td><td style="text-align:center">${r.nee}</td><td style="text-align:center">${r.firmados}/${tot}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('');
   const docsHTML=GESTION_DOCS.map(d=>{ const p=d.total?Math.round(d.firmados/d.total*100):0;
     return `<tr><td><b>${esc(d.nombre)}</b><br><span style="color:#666;font-size:9px">${esc(d.full)}</span></td><td style="text-align:center">${d.firmados}/${d.total}</td><td style="text-align:center">${d.total-d.firmados}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('');
