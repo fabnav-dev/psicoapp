@@ -467,7 +467,7 @@ function Toast({ t, msg }){ if(!msg) return null; return <div style={{ position:
 // ════════════════ EQUIPO ════════════════════════════════════════
 const CURSO_GRID = {
   niveles:['1°','2°','3°','4°','5°','6°','7°','8°','I°','II°','III°','IV°'],
-  letras:['A','B','C','D'],
+  letras:['A','B','C','D','E'],
 };
 // nº de estudiantes con NEE por curso (demo)
 const NEE_POR_CURSO = { '3°A':1, '5°B':2, '7°A':1, 'I°A':1 };
@@ -697,13 +697,14 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
             </div>
           ) : (
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'14px 12px' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'34px repeat(4,1fr)', gap:6, alignItems:'center' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'34px repeat(5,1fr)', gap:6, alignItems:'center' }}>
               <div></div>
               {CURSO_GRID.letras.map(l=><div key={l} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:t.muted }}>{l}</div>)}
               {CURSO_GRID.niveles.map(n=>(
                 <React.Fragment key={n}>
                   <div style={{ fontSize:10, fontWeight:700, color:t.ink, textAlign:'right', paddingRight:4 }}>{n}</div>
                   {CURSO_GRID.letras.map(l=>{
+                    if(l==='E' && (n==='III°'||n==='IV°')) return <div key={l}></div>;
                     const code=n+l; const nee=neeCount[code]||0;
                     return (
                       <button key={l} onClick={()=>setCurso(code)} style={{ position:'relative', height:38, borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
@@ -1761,13 +1762,14 @@ function ProfesorDashboard({ t }){
             </div>
           ) : (
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'14px 12px' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'34px repeat(4,1fr)', gap:6, alignItems:'center' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'34px repeat(5,1fr)', gap:6, alignItems:'center' }}>
               <div></div>
               {CURSO_GRID.letras.map(l=><div key={l} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:t.muted }}>{l}</div>)}
               {CURSO_GRID.niveles.map(n=>(
                 <React.Fragment key={n}>
                   <div style={{ fontSize:10, fontWeight:700, color:t.ink, textAlign:'right', paddingRight:4 }}>{n}</div>
                   {CURSO_GRID.letras.map(l=>{
+                    if(l==='E' && (n==='III°'||n==='IV°')) return <div key={l}></div>;
                     const code=n+l; const nee=NEE_POR_CURSO[code]||0;
                     return (
                       <button key={l} onClick={()=>{ setCurso(code); setOpen(null); }} style={{ position:'relative', height:38, borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
