@@ -689,7 +689,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const show=(m)=>{ setToast(m); setTimeout(()=>setToast(null),2600); };
   const roster=[...ESTUDIANTES,...extra];
   const agregarEst=(arr)=>{ setExtra(p=>{ const ruts=new Set(arr.map(e=>(e.rut||'').replace(/\s/g,'').toLowerCase()).filter(Boolean)); const base=p.filter(e=>!(e.rut&&ruts.has((e.rut||'').replace(/\s/g,'').toLowerCase()))); return [...base,...arr]; }); setIntake(null); show('✓ '+arr.length+' estudiante'+(arr.length!==1?'s':'')+' cargado'+(arr.length!==1?'s':'')+' a la nómina'); };
-  const vaciarNomina=()=>{ if(window.confirm('¿Vaciar la nómina cargada? Se quitarán los estudiantes importados o agregados manualmente (los datos de demostración se mantienen).')){ setExtra([]); show('Nómina cargada vaciada'); } };
+  const vaciarNomina=()=>{ const r=window.prompt('Esta acción borra TODA la nómina cargada (los datos de demostración se mantienen). Para confirmar, escribe la palabra BORRAR:'); if(r===null) return; if(r.trim().toUpperCase()==='BORRAR'){ setExtra([]); show('Nómina cargada vaciada'); } else { show('Cancelado: no se escribió BORRAR'); } };
 
   if(sel) return <FichaEstudiante t={t} est={sel} onBack={()=>setSel(null)} onToast={show} toast={toast} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />;
   if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} revisiones={revisiones} onBack={()=>setCurso(null)} onSel={setSel} />;
