@@ -688,7 +688,8 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const { seg }=useSeguimiento();
   const show=(m)=>{ setToast(m); setTimeout(()=>setToast(null),2600); };
   const roster=[...ESTUDIANTES,...extra];
-  const agregarEst=(arr)=>{ setExtra(p=>[...p,...arr]); setIntake(null); show('✓ '+arr.length+' estudiante'+(arr.length!==1?'s':'')+' cargado'+(arr.length!==1?'s':'')+' a la nómina'); };
+  const agregarEst=(arr)=>{ setExtra(p=>{ const ruts=new Set(arr.map(e=>(e.rut||'').replace(/\s/g,'').toLowerCase()).filter(Boolean)); const base=p.filter(e=>!(e.rut&&ruts.has((e.rut||'').replace(/\s/g,'').toLowerCase()))); return [...base,...arr]; }); setIntake(null); show('✓ '+arr.length+' estudiante'+(arr.length!==1?'s':'')+' cargado'+(arr.length!==1?'s':'')+' a la nómina'); };
+  const vaciarNomina=()=>{ if(window.confirm('¿Vaciar la nómina cargada? Se quitarán los estudiantes importados o agregados manualmente (los datos de demostración se mantienen).')){ setExtra([]); show('Nómina cargada vaciada'); } };
 
   if(sel) return <FichaEstudiante t={t} est={sel} onBack={()=>setSel(null)} onToast={show} toast={toast} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />;
   if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} revisiones={revisiones} onBack={()=>setCurso(null)} onSel={setSel} />;
@@ -772,6 +773,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
           <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
             <button onClick={()=>setIntake(intake==='import'?null:'import')} style={{ flex:'1 1 150px', padding:'11px 12px', background:intake==='import'?t.primary:t.card, color:intake==='import'?'#fff':t.ink, border:`1px solid ${intake==='import'?t.primary:t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Icon k="download" c={intake==='import'?'#fff':t.primary} s={17} />Importar nómina</button>
             <button onClick={()=>setIntake(intake==='manual'?null:'manual')} style={{ flex:'1 1 150px', padding:'11px 12px', background:intake==='manual'?t.primary:t.card, color:intake==='manual'?'#fff':t.ink, border:`1px solid ${intake==='manual'?t.primary:t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>＋ Nuevo estudiante</button>
+            {extra.length>0 && <button onClick={vaciarNomina} style={{ flex:'1 1 150px', padding:'11px 12px', background:t.card, color:'#B23A24', border:`1px solid ${t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>Vaciar nómina cargada</button>}
           </div>
           {intake && <IntakePanel t={t} mode={intake} onAdd={agregarEst} onClose={()=>setIntake(null)} />}
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Selecciona un curso</div>
