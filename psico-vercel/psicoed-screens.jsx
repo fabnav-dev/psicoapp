@@ -562,7 +562,7 @@ function parseNominaMatriz(matriz, cursoFallback){
     if(!rut && !/[a-záéíóú]/i.test(nombre)) continue;
     // "N" en la planilla = alumno NUEVO (no es NEE). La NEE se asigna después.
     const nuevo=f.slice((iRut>=0?iRut:3)+1).some(c=>/^n$/i.test(c));
-    out.push({ id:'imp'+Date.now()+'_'+r, nombre, curso:curso||'—', rut, apoderado:'', email:'', diag:'—', plan:'—', nee:false, nuevo, estado:'pendiente', edad:'', prof:'', avance:0 });
+    out.push({ id:'imp_'+String(curso||'x').replace(/[^0-9a-z]/gi,'')+'_'+r+'_'+Math.random().toString(36).slice(2,8), nombre, curso:curso||'—', rut, apoderado:'', email:'', diag:'—', plan:'—', nee:false, nuevo, estado:'pendiente', edad:'', prof:'', avance:0 });
   }
   return out;
 }
