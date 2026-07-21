@@ -2020,10 +2020,20 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
   const [phase,setPhase]=useState('idle'); // idle | uploading | done
   const [hist,setHist]=useState([{ doc:'Informe Fonoaudiología.pdf', fecha:'12 mar 2026', estado:'Procesado' }]);
   const [revisando,setRevisando]=useState(null); // documento en pantalla de revisión
-  const HIJOS=[{ id:'e1', nombre:'Sofía Contreras', curso:'3°A Básico' },{ id:'e3', nombre:'Isidora Vera', curso:'I°A Medio' }];
+  const [hijos,setHijos]=useState(()=>lsGet('psico_apo_hijos_v1',[]));
+  useEffect(()=>{ lsSet('psico_apo_hijos_v1', hijos); },[hijos]);
+  const HIJOS = hijos;
+  const rosterApo=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
+  const normRut=(s)=>String(s||'').replace(/[.\s]/g,'').toLowerCase();
+  const [rutBusca,setRutBusca]=useState('');
+  const [vinculando,setVinculando]=useState(false);
+  const vincular=(e)=>{ if(hijos.some(h=>h.id===e.id)){ setHijo(e.id); setVinculando(false); setRutBusca(''); return; } setHijos(p=>[...p,{ id:e.id, nombre:e.nombre, curso:e.curso }]); setHijo(e.id); setVinculando(false); setRutBusca(''); };
+  const desvincular=(id)=>setHijos(p=>p.filter(h=>h.id!==id));
+  const buscaHijo=(q)=>{ const t=q.trim(); if(!t) return []; const porRut=normRut(t); return rosterApo.filter(e=> (e.rut&&normRut(e.rut).includes(porRut)) || (e.nombre+' '+e.curso).toLowerCase().includes(t.toLowerCase())).slice(0,20); };
   const conDoc = (revisiones||[]).find(r=>HIJOS.some(h=>h.id===r.estId));
-  const [hijo,setHijo]=useState(conDoc ? conDoc.estId : 'e1');
-  const hijoSel=HIJOS.find(h=>h.id===hijo) || HIJOS[0];
+  const [hijo,setHijo]=useState(HIJOS[0]?HIJOS[0].id:null);
+  useEffect(()=>{ if(!HIJOS.some(h=>h.id===hijo)) setHijo(HIJOS[0]?HIJOS[0].id:null); },[hijos]);
+  const hijoSel=HIJOS.find(h=>h.id===hijo) || HIJOS[0] || null;
   const inf=useInforme();
   const [subMsg,setSubMsg]=useState('');
 
@@ -2055,15 +2065,53 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
 
   return (
     <div style={{ maxWidth:560, margin:'0 auto', padding:'16px 16px 50px' }} className="fade">
+      {HIJOS.length===0 ? (
+        <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'20px 18px', marginTop:20 }} className="scale">
+          <div style={{ fontFamily:t.display, fontSize:18, fontWeight:700, color:t.ink, marginBottom:4 }}>Vincula a tu estudiante</div>
+          <div style={{ fontSize:12, color:t.muted, marginBottom:14, lineHeight:1.5 }}>Ingresa el <b>RUT</b> de tu hijo/a (o su nombre) tal como está en el colegio. Solo verás la información de tu estudiante.</div>
+          <input value={rutBusca} onChange={e=>setRutBusca(e.target.value)} placeholder="RUT o nombre del estudiante…" style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', background:t.card, color:t.ink }} />
+          <div style={{ display:'flex', flexDirection:'column', gap:7, marginTop:10, maxHeight:280, overflowY:'auto' }}>
+            {buscaHijo(rutBusca).map(e=>(
+              <button key={e.id} onClick={()=>vincular(e)} style={{ textAlign:'left', cursor:'pointer', background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'11px 13px', display:'flex', alignItems:'center', gap:11 }}>
+                <div style={{ width:38, height:38, borderRadius:11, background:t.card, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0, fontSize:12 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+                <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}{e.rut?' · '+e.rut:''}</div></div>
+                <span style={{ flexShrink:0, color:t.primary, fontSize:12, fontWeight:800 }}>Vincular</span>
+              </button>
+            ))}
+            {rutBusca.trim() && buscaHijo(rutBusca).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:14 }}>No se encontró ese estudiante en la nómina. Verifica el RUT con el colegio.</div>}
+          </div>
+        </div>
+      ) : (<React.Fragment>
       <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'15px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:12 }}>
         <div style={{ width:44, height:44, borderRadius:12, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center' }}><Icon k="apoderado" c={t.primary} s={24} /></div>
-        <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:t.ink }}>Hola, Ana</div><div style={{ fontSize:11, color:t.muted }}>Apoderada · {hijoSel.curso}</div></div>
+        <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:t.ink }}>Hola</div><div style={{ fontSize:11, color:t.muted }}>Apoderado/a{hijoSel?' · '+hijoSel.curso:''}</div></div>
         {HIJOS.length>1 && (
-          <select value={hijo} onChange={e=>setHijo(e.target.value)} style={{ flexShrink:0, padding:'8px 10px', borderRadius:9, border:`1px solid ${t.border}`, fontSize:11.5, fontWeight:700, color:t.ink, background:t.card }}>
+          <select value={hijo||''} onChange={e=>setHijo(e.target.value)} style={{ flexShrink:0, padding:'8px 10px', borderRadius:9, border:`1px solid ${t.border}`, fontSize:11.5, fontWeight:700, color:t.ink, background:t.card }}>
             {HIJOS.map(h=><option key={h.id} value={h.id}>{h.nombre.split(' ')[0]}</option>)}
           </select>
         )}
+        <button onClick={()=>setVinculando(v=>!v)} title="Vincular otro estudiante" style={{ flexShrink:0, background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 11px', fontSize:12, fontWeight:800, cursor:'pointer' }}>＋</button>
       </div>
+      {vinculando && (
+        <div style={{ background:t.card, border:`1px solid ${t.primary}`, borderRadius:t.radius, padding:14, marginBottom:14 }} className="slide">
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <div style={{ fontSize:12.5, fontWeight:800, color:t.ink }}>Mis estudiantes</div>
+            <button onClick={()=>{ setVinculando(false); setRutBusca(''); }} style={{ background:'none', border:'none', fontSize:16, color:t.muted, cursor:'pointer' }}>✕</button>
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:10 }}>
+            {HIJOS.map(h=><span key={h.id} style={{ display:'inline-flex', alignItems:'center', gap:7, background:t.soft, color:t.ink, fontSize:11.5, fontWeight:700, padding:'4px 6px 4px 11px', borderRadius:99 }}>{h.nombre.split(' ')[0]} · {h.curso}<button onClick={()=>desvincular(h.id)} style={{ background:'none', border:'none', color:t.muted, cursor:'pointer', fontSize:14, lineHeight:1 }}>×</button></span>)}
+          </div>
+          <input value={rutBusca} onChange={e=>setRutBusca(e.target.value)} placeholder="RUT o nombre para vincular otro…" style={{ width:'100%', padding:'10px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', background:t.card, color:t.ink }} />
+          <div style={{ display:'flex', flexDirection:'column', gap:7, marginTop:9, maxHeight:220, overflowY:'auto' }}>
+            {buscaHijo(rutBusca).filter(e=>!hijos.some(h=>h.id===e.id)).map(e=>(
+              <button key={e.id} onClick={()=>vincular(e)} style={{ textAlign:'left', cursor:'pointer', background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:11 }}>
+                <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}{e.rut?' · '+e.rut:''}</div></div>
+                <span style={{ flexShrink:0, color:t.primary, fontSize:12, fontWeight:800 }}>Vincular</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* recordatorio automático */}
       {porRevisar.length>0 && (
@@ -2210,6 +2258,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
         ))}
         <div style={{ fontSize:10.5, color:t.muted, marginTop:4, lineHeight:1.5 }}>Si tienes dudas, puedes escribir al equipo psicoeducativo: psicoeducativo@cmpe.cl</div>
       </div>
+      </React.Fragment>)}
     </div>
   );
 }
