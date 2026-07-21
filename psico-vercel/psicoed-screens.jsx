@@ -2024,14 +2024,21 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
   const conDoc = (revisiones||[]).find(r=>HIJOS.some(h=>h.id===r.estId));
   const [hijo,setHijo]=useState(conDoc ? conDoc.estId : 'e1');
   const hijoSel=HIJOS.find(h=>h.id===hijo) || HIJOS[0];
+  const inf=useInforme();
+  const [subMsg,setSubMsg]=useState('');
 
-  const subir=()=>{
-    setPhase('uploading');
-    setTimeout(()=>{
+  const subir=async(file)=>{
+    if(!file) return;
+    const esImagen=/^image\//.test(file.type);
+    if(!esImagen && file.size>10*1024*1024){ setSubMsg('El PDF supera 10 MB; comprímelo o súbelo como foto.'); return; }
+    setPhase('uploading'); setSubMsg('');
+    try{
+      const meta=await subirInformeArchivo(hijo, file);
+      inf.cargar(hijo, { ...meta, origen:'Apoderado' });
+      onUpload({ from:'Apoderado · '+(hijoSel.nombre||'Apoderado'), curso:normCurso(hijoSel.curso), doc:file.name, fecha:hoyStr(), estId:hijo });
+      setHist(h=>[{ doc:file.name, fecha:'Hoy', estado:'Enviado al equipo' },...h]);
       setPhase('done');
-      onUpload({ from:'Apoderado · Ana López', curso:'3°A', doc:'Informe Psiquiatría.pdf', fecha:'Hoy 13:40' });
-      setHist(h=>[{ doc:'Informe Psiquiatría.pdf', fecha:'Hoy', estado:'Enviado al equipo' },...h]);
-    }, 1600);
+    }catch(err){ setPhase('idle'); setSubMsg('No se pudo subir el informe: '+(err.message||'error')); }
   };
 
   // solo documentos del hijo seleccionado (match por estudiante)
@@ -2163,11 +2170,13 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
         <div style={{ fontSize:14, fontWeight:700, color:t.ink, marginBottom:4 }}>Subir informe de especialista</div>
         <div style={{ fontSize:11.5, color:t.muted, marginBottom:16, lineHeight:1.5 }}>Adjunta el informe externo (neurología, psiquiatría, fonoaudiología…). El equipo psicoeducativo recibirá una notificación al instante.</div>
         {phase!=='done' ? (
-          <button onClick={subir} disabled={phase==='uploading'} style={{ width:'100%', border:`2px dashed ${t.primary}`, background:t.soft, borderRadius:14, padding:'26px 16px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+          <label style={{ width:'100%', border:`2px dashed ${t.primary}`, background:t.soft, borderRadius:14, padding:'26px 16px', cursor:phase==='uploading'?'default':'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+            <input type="file" accept="application/pdf,image/*" disabled={phase==='uploading'} style={{ display:'none' }} onChange={(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; subir(f); }} />
             <div style={{ width:52, height:52, borderRadius:'50%', background:t.card, display:'flex', alignItems:'center', justifyContent:'center' }}><Icon k="upload" c={t.primary} s={26} /></div>
             <span style={{ fontSize:13, fontWeight:700, color:t.primaryDark }}>{phase==='uploading'?'Subiendo y notificando…':'Toca para seleccionar archivo'}</span>
             <span style={{ fontSize:10.5, color:t.muted }}>PDF, JPG o PNG · máx. 10 MB</span>
-          </button>
+            {subMsg && <span style={{ fontSize:10.5, color:'#B23A24', fontWeight:700 }}>{subMsg}</span>}
+          </label>
         ) : (
           <div style={{ background:t.soft, borderRadius:14, padding:'24px 16px' }} className="scale">
             <div style={{ width:54, height:54, borderRadius:'50%', background:t.primary, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px' }}><Icon k="check" c="#fff" s={30} /></div>
