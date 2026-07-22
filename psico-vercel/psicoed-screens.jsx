@@ -2543,6 +2543,15 @@ function GestionDashboard({ t, revisiones }){
   const [tab,setTab]=useState('resumen'); // resumen | tendencia | ciclos | cursos
   const GC = gestionRowsReales();
   const colegio = aggrega(GC);
+  // Planes por vencer: derivado de revisiones firmadas/archivadas (vigencia anual real)
+  const MES3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const vence = (revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado').map(r=>{
+    const m=(String(r.fechaFirma||'').match(/(\d{1,2})\s*([a-z]{3})/i)); if(!m) return null;
+    const dia=parseInt(m[1],10); const mi=MES3.indexOf(m[2].toLowerCase()); if(mi<0) return null;
+    const firma=new Date(2026,mi,dia); const vto=new Date(firma.getTime()+365*864e5);
+    const dias=Math.ceil((vto-new Date())/864e5);
+    return (dias>0 && dias<=30) ? { curso:normCurso(r.curso), plan:r.planNombre||r.planId, dias } : null;
+  }).filter(Boolean);
   const enRonda = (revisiones||[]).filter(r=> r.estado==='firmado').length;
   const archivados = (revisiones||[]).filter(r=> r.estado==='archivado').length;
   const TENDENCIA = gestionTendenciaReal();
@@ -2582,8 +2591,8 @@ function GestionDashboard({ t, revisiones }){
         const paec=DOCS.find(d=>d.id==='PAEC'); const vencidos=0;
         const items=[
           { ok:colegio.pct>=80, t:'Planes de apoyo (PAI/PACI) vigentes y firmados', d:`${colegio.firmados} de ${colegio.total} documentos firmados`, dec:'Decreto 83/2015' },
-          { ok:GESTION_VENCE.length===0, t:'Sin planes vencidos', d:`${GESTION_VENCE.length} plan(es) por vencer en los próximos 30 días`, dec:'Vigencia anual' },
-          { ok:(paec.firmados/paec.total)>=0.7, t:'Adecuaciones evaluativas declaradas (PAEC)', d:`${paec.firmados} de ${paec.total} evaluaciones diferenciadas formalizadas`, dec:'Decreto 67/2018' },
+          { ok:vence.length===0, t:'Sin planes vencidos', d:`${vence.length} plan(es) por vencer en los próximos 30 días`, dec:'Vigencia anual' },
+          { ok:paec.total===0?true:(paec.firmados/paec.total)>=0.7, t:'Adecuaciones evaluativas declaradas (PAEC)', d:`${paec.firmados} de ${paec.total} evaluaciones diferenciadas formalizadas`, dec:'Decreto 67/2018' },
           { ok:true, t:'Registro de firmas del equipo y del apoderado', d:'Cada plan queda con folio, fecha y firmas trazables', dec:'Respaldo auditable' },
         ];
         return (
@@ -2614,11 +2623,11 @@ function GestionDashboard({ t, revisiones }){
               </div>
             ))}
           </div>
-          {GESTION_VENCE.length>0 && (
+          {vence.length>0 && (
             <React.Fragment>
               <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:8 }}>Planes por vencer</div>
               <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, overflow:'hidden', marginBottom:8 }}>
-                {GESTION_VENCE.slice().sort((a,b)=>a.dias-b.dias).map((v,i)=>{ const urg=v.dias<=14; return (
+                {vence.slice().sort((a,b)=>a.dias-b.dias).map((v,i)=>{ const urg=v.dias<=14; return (
                   <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 15px', borderTop:i>0?`1px solid ${t.border}`:'none' }}>
                     <span style={{ width:10, height:10, borderRadius:'50%', background:urg?'#B23A24':'#C2841E', flexShrink:0 }} />
                     <div style={{ flex:1 }}><span style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>{v.plan} · Curso {v.curso}</span></div>
@@ -2636,13 +2645,15 @@ function GestionDashboard({ t, revisiones }){
       {/* AHORRO DE TIEMPO · ROI */}
       {tab==='ahorro' && (()=>{
         const fmt=(n)=>'$'+Math.round(n).toLocaleString('es-CL');
-        const hSem=Math.round(AHORRO.docsSemana*AHORRO.horasPorDoc);
-        const hMes=Math.round(AHORRO.docsMes*AHORRO.horasPorDoc);
-        const hAnio=Math.round(AHORRO.docsAnio*AHORRO.horasPorDoc);
+        const docsMes=(revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado').length;
+        const AH={ horasPorDoc:3.5, valorHora:14000, docsSemana:docsMes, docsMes:docsMes, docsAnio:docsMes };
+        const hSem=Math.round(AH.docsSemana*AH.horasPorDoc);
+        const hMes=Math.round(AH.docsMes*AH.horasPorDoc);
+        const hAnio=Math.round(AH.docsAnio*AH.horasPorDoc);
         const desglose=[
-          { t:'Planes pre-rellenados con IA', d:'La IA lee el informe y propone adecuaciones', h:Math.round(AHORRO.docsMes*2.2) },
-          { t:'Firma digital (sin imprimir ni juntar al equipo)', d:'Ronda de firmas en línea con folio', h:Math.round(AHORRO.docsMes*0.8) },
-          { t:'Expedientes y reportes automáticos', d:'Documentación lista para descargar', h:Math.round(AHORRO.docsMes*0.5) },
+          { t:'Planes pre-rellenados con IA', d:'La IA lee el informe y propone adecuaciones', h:Math.round(AH.docsMes*2.2) },
+          { t:'Firma digital (sin imprimir ni juntar al equipo)', d:'Ronda de firmas en línea con folio', h:Math.round(AH.docsMes*0.8) },
+          { t:'Expedientes y reportes automáticos', d:'Documentación lista para descargar', h:Math.round(AH.docsMes*0.5) },
         ];
         return (
         <div className="fade">
@@ -2650,12 +2661,12 @@ function GestionDashboard({ t, revisiones }){
             <div style={{ fontSize:11, fontWeight:800, opacity:0.85, textTransform:'uppercase', letterSpacing:0.6 }}>Ahorro de tiempo del equipo · este mes</div>
             <div style={{ display:'flex', alignItems:'baseline', gap:10, marginTop:6, flexWrap:'wrap' }}>
               <span style={{ fontFamily:t.display, fontSize:46, fontWeight:800, lineHeight:1 }}>{hMes} h</span>
-              <span style={{ fontSize:15, fontWeight:700, opacity:0.9 }}>≈ {fmt(hMes*AHORRO.valorHora)} en tiempo profesional</span>
+              <span style={{ fontSize:15, fontWeight:700, opacity:0.9 }}>≈ {fmt(hMes*AH.valorHora)} en tiempo profesional</span>
             </div>
-            <div style={{ fontSize:12, opacity:0.85, marginTop:8 }}>{AHORRO.docsMes} documentos gestionados · {AHORRO.horasPorDoc} h ahorradas por documento (promedio).</div>
+            <div style={{ fontSize:12, opacity:0.85, marginTop:8 }}>{AH.docsMes} documentos gestionados · {AH.horasPorDoc} h ahorradas por documento (promedio).</div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
-            {[['Esta semana',hSem+' h',fmt(hSem*AHORRO.valorHora)],['Este mes',hMes+' h',fmt(hMes*AHORRO.valorHora)],['Acumulado año',hAnio+' h',fmt(hAnio*AHORRO.valorHora)]].map(([l,v,m])=>(
+            {[['Esta semana',hSem+' h',fmt(hSem*AH.valorHora)],['Este mes',hMes+' h',fmt(hMes*AH.valorHora)],['Acumulado año',hAnio+' h',fmt(hAnio*AH.valorHora)]].map(([l,v,m])=>(
               <div key={l} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'14px 12px', textAlign:'center' }}>
                 <div style={{ fontFamily:t.display, fontSize:24, fontWeight:800, color:t.primary }}>{v}</div>
                 <div style={{ fontSize:11, fontWeight:700, color:'#1E7A53', marginTop:2 }}>{m}</div>
@@ -2768,7 +2779,7 @@ function GestionDashboard({ t, revisiones }){
           {/* cumplimiento normativo */}
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, margin:'18px 0 10px' }}>Cumplimiento normativo</div>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {[['Decreto 83/2015 · Diversificación de la enseñanza',92],['Decreto 67/2018 · Evaluación y promoción',88],['Planes con revisión vigente (al día)',74],['Documentación firmada y archivada',Math.round(archivados/(enRonda+archivados||1)*100)]].map(([lbl,pct])=>{ const tn=tono(pct); return (
+            {(()=>{ const d83=(()=>{ const g=DOCS.filter(d=>d.id==='PAI'||d.id==='PACI'); const tot=g.reduce((a,d)=>a+d.total,0), fi=g.reduce((a,d)=>a+d.firmados,0); return tot?Math.round(fi/tot*100):0; })(); const paec2=DOCS.find(d=>d.id==='PAEC'); const d67=paec2&&paec2.total?Math.round(paec2.firmados/paec2.total*100):0; const vig=colegio.pct||0; const arch=Math.round(archivados/(enRonda+archivados||1)*100); return [['Decreto 83/2015 · Diversificación de la enseñanza',d83],['Decreto 67/2018 · Evaluación y promoción',d67],['Planes con revisión vigente (al día)',vig],['Documentación firmada y archivada',arch]]; })().map(([lbl,pct])=>{ const tn=tono(pct); return (
               <div key={lbl} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'11px 15px', display:'flex', alignItems:'center', gap:12 }}>
                 <Icon k="check" c={tn.c} s={17} />
                 <span style={{ flex:1, fontSize:11.5, color:t.ink, fontWeight:600 }}>{lbl}</span>
@@ -2949,7 +2960,7 @@ function imprimirGestion(colegio){
   <h2>Adherencia docente en aula</h2>
   <table><thead><tr><th>Curso</th><th style="text-align:center">Asignaturas que confirmaron</th><th style="text-align:center">Adherencia</th></tr></thead><tbody>${Object.keys(ADH_EXP).length===0?`<tr><td colspan="3" style="text-align:center;color:#666">Aún sin datos de adherencia docente</td></tr>`:Object.entries(ADH_EXP).map(([cur,v])=>{ const c=Array.isArray(v)?v[0]:0, m=Array.isArray(v)?v[1]:0; const p=m?Math.round(c/m*100):0; return `<tr><td>${esc(cur)}</td><td style="text-align:center">${c} de ${m}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('')}</tbody></table>
   <h2>Cumplimiento normativo</h2>
-  <table><thead><tr><th>Indicador</th><th style="text-align:center">Cumplimiento</th></tr></thead><tbody>${[['Decreto 83/2015 · Diversificación de la enseñanza',92],['Decreto 67/2018 · Evaluación y promoción',88],['Planes con revisión vigente (al día)',74]].map(([l,p])=>`<tr><td>${esc(l)}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`).join('')}</tbody></table>
+  <table><thead><tr><th>Indicador</th><th style="text-align:center">Cumplimiento</th></tr></thead><tbody>${(()=>{ const g=DOCS_EXP.filter(d=>d.id==='PAI'||d.id==='PACI'); const tot=g.reduce((a,d)=>a+d.total,0), fi=g.reduce((a,d)=>a+d.firmados,0); const d83=tot?Math.round(fi/tot*100):0; const pc=DOCS_EXP.find(d=>d.id==='PAEC'); const d67=pc&&pc.total?Math.round(pc.firmados/pc.total*100):0; const vig=colegio&&colegio.pct?colegio.pct:0; return [['Decreto 83/2015 · Diversificación de la enseñanza',d83],['Decreto 67/2018 · Evaluación y promoción',d67],['Planes con revisión vigente (al día)',vig]]; })().map(([l,p])=>`<tr><td>${esc(l)}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`).join('')}</tbody></table>
   <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
   </body></html>`);
