@@ -1042,7 +1042,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const DIAG_PLANTILLAS = {
     'TEA':[0,1,3], 'TDAH':[1,3], 'ansios':[4], 'intelectual':[0,2], 'def':[0,2] };
   const aplicarPlantilla=()=>{
-    const key=Object.keys(DIAG_PLANTILLAS).find(k=> (est.diag||'').toLowerCase().includes(k.toLowerCase())) || 'def';
+    const key=Object.keys(DIAG_PLANTILLAS).find(k=> ((datos.diag||est.diag)||'').toLowerCase().includes(k.toLowerCase())) || 'def';
     const grupos=DIAG_PLANTILLAS[key]; const m={};
     (planId==='PAEC'?ADEC_EVAL:planId==='PSM'?ADEC_PSM:ADEC_ACCESO).forEach((g,gi)=>{ if(grupos.includes(gi)) g.items.forEach((it,ii)=>{ if(ii%2===0) m[gi+'-'+ii]=true; }); });
     setMarcadas(m); setPhase('listo'); setModo('manual'); onToast('Plantilla aplicada según diagnóstico');
@@ -1083,7 +1083,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
       }
       content = blocks;
     } else {
-      content = instrucc + `\n\nINFORME (demostración): informe de neurología que recomienda apoyos acordes al diagnóstico ${est.diag}.`;
+      content = instrucc + `\n\nINFORME (demostración): informe de neurología que recomienda apoyos acordes al diagnóstico ${datos.diag||est.diag}.`;
     }
     try{
       const r=await window.claude.complete({ messages:[{ role:'user', content }], max_tokens:1500 });
@@ -1134,7 +1134,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
           <div style={{ width:52, height:52, borderRadius:14, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, fontSize:18 }}>{est.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
           <div style={{ flex:1 }}>
             <div style={{ fontFamily:t.display, fontSize:19, fontWeight:600, color:t.ink }}>{est.nombre}</div>
-            <div style={{ fontSize:11.5, color:t.muted, marginTop:2 }}>{est.curso}{est.rut?` · ${est.rut}`:''}{esNEE && (est.diag||est.edad)?` · ${[est.edad,est.diag].filter(Boolean).join(' · ')}`:''}</div>
+            <div style={{ fontSize:11.5, color:t.muted, marginTop:2 }}>{est.curso}{est.rut?` · ${est.rut}`:''}{esNEE && (datos.diag||datos.edad)?` · ${[datos.edad,datos.diag].filter(Boolean).join(' · ')}`:''}</div>
           </div>
           {esNEE && (tieneInforme
             ? <button onClick={()=>setVerInforme(true)} style={{ flexShrink:0, background:t.soft, color:t.primaryDark, border:'none', borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}><Icon k="doc" c={t.primary} s={16} />Ver informe médico</button>
@@ -1352,7 +1352,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
             </button>
           </div>
           <button onClick={aplicarPlantilla} disabled={phase==='generando'} style={{ width:'100%', marginTop:10, padding:'11px 14px', background:t.soft, color:t.primaryDark, border:'none', borderRadius:12, cursor:'pointer', fontSize:12.5, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-            <Icon k="check" c={t.primary} s={17} />Aplicar plantilla por diagnóstico ({(est.diag||'').split(' ')[0]})
+            <Icon k="check" c={t.primary} s={17} />Aplicar plantilla por diagnóstico ({((datos.diag||est.diag)||'').split(' ')[0]})
           </button>
         </div>
       )}
@@ -1387,7 +1387,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
             <div style={{ padding:'16px 18px' }}>
               <SectTitle t={t}>Identificación del estudiante</SectTitle>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'9px 14px', marginBottom:18 }}>
-                {[['Nombre',est.nombre],['Curso',est.curso],['Edad',est.edad],['Diagnóstico',est.diag],['Establecimiento','Colegio Mayor Peñalolén'],['Fecha elaboración','17 jun 2026']].map(([k,v])=>(
+                {[['Nombre',est.nombre],['Curso',est.curso],['Edad',datos.edad||est.edad],['Diagnóstico',datos.diag||est.diag],['Establecimiento','Colegio Mayor Peñalolén'],['Fecha elaboración','17 jun 2026']].map(([k,v])=>(
                   <div key={k}>
                     <div style={{ fontSize:9.5, fontWeight:700, color:t.muted, textTransform:'uppercase', letterSpacing:0.5 }}>{k}</div>
                     {modo==='manual'
