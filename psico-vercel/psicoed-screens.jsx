@@ -2359,7 +2359,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
           </div>
           <div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{r.planFull}</div>
           <div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{r.estNombre} · {r.curso} · firmado por todo el equipo · Folio {r.folio}</div>
-          <a href={'data:text/plain,'} onClick={e=>{ e.preventDefault(); imprimirOficial(PLANES.find(p=>p.id===r.planId)||PLANES[0], {nombre:r.estNombre,curso:r.curso,diag:'',edad:''}, r.marcadas||{}, (r.adecKey==='PAEC'?ADEC_EVAL:r.adecKey==='PSM'?ADEC_PSM:ADEC_ACCESO), '', {}, r.director, r.equipo||{}, r.obs||'', r, true); }} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, marginTop:10, padding:11, background:t.primary, color:'#fff', borderRadius:11, fontSize:12, fontWeight:700, textDecoration:'none' }}>
+          <a href={'data:text/plain,'} onClick={e=>{ e.preventDefault(); imprimirOficial(PLANES.find(p=>p.id===r.planId)||PLANES[0], {id:r.estId,nombre:r.estNombre,curso:r.curso,diag:'',edad:''}, r.marcadas||{}, (r.adecKey==='PAEC'?ADEC_EVAL:r.adecKey==='PSM'?ADEC_PSM:ADEC_ACCESO), '', {}, r.director, r.equipo||{}, r.obs||'', r, true); }} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, marginTop:10, padding:11, background:t.primary, color:'#fff', borderRadius:11, fontSize:12, fontWeight:700, textDecoration:'none' }}>
             <Icon k="download" c="#fff" s={15} />Ver / descargar documento firmado
           </a>
         </div>
