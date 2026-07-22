@@ -1500,7 +1500,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
                     {firmandoIdx!==null && (
                       <div style={{ marginTop:12 }}>
                         <div style={{ fontSize:11, fontWeight:700, color:t.ink, marginBottom:7 }}>Firma de {fi[firmandoIdx].rol}</div>
-                        <FirmaDigital t={t} rev={rev} soloFirma onCancel={()=>setFirmandoIdx(null)} onFirmar={(firma)=>{ firmarInterno(rev.id, firmandoIdx, firma); setFirmandoIdx(null); onToast('✓ Firma registrada'); }} />
+                        <FirmaDigital t={t} rev={rev} soloFirma onCancel={()=>setFirmandoIdx(null)} onFirmar={(firma)=>{ auditPush(fi[firmandoIdx].rol, `firmó documento de ${est.nombre} (${normCurso(est.curso)})`); firmarInterno(rev.id, firmandoIdx, firma); setFirmandoIdx(null); onToast('✓ Firma registrada'); }} />
                       </div>
                     )}
                     {completo && (
@@ -2903,6 +2903,7 @@ function GestionDashboard({ t, revisiones }){
 
 // exporta a Excel (CSV con BOM, lo abre Excel directamente)
 function exportarExcel(){
+  auditPush('Gestión','exportó informe a Excel');
   const GC_EXP=gestionRowsReales();
   const filas=[['Curso','Estudiantes NEE','Firmados','Por firmar','Avance %']];
   GC_EXP.forEach(r=>{ const tot=r.firmados+r.porFirmar; filas.push([r.curso, r.nee, r.firmados, r.porFirmar, tot?Math.round(r.firmados/tot*100):0]); });
@@ -2914,6 +2915,7 @@ function exportarExcel(){
 
 // informe de gestión imprimible
 function imprimirGestion(colegio){
+  auditPush('Gestión','exportó / imprimió informe de gestión');
   const GC_EXP=gestionRowsReales();
   const DOCS_EXP=gestionDocsReales();
   const TEND_EXP=gestionTendenciaReal();
@@ -3109,6 +3111,15 @@ const DESREG_SEED = {
 const SALUD_NIVEL = { alto:{c:'#B23A24',bg:'#FBE6E2',lbl:'Riesgo alto'}, medio:{c:'#C2841E',bg:'#FCEFD9',lbl:'Atención'}, bajo:{c:'#1E7A53',bg:'#E2F3EC',lbl:'Estable'} };
 
 function hoyStr(){ return new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}); }
+// Registro de auditoría real: agrega una entrada [hora, actor, acción] (máx 30)
+function auditPush(actor, accion){
+  try{
+    const log=JSON.parse(localStorage.getItem('psico_audit_v1')||'[]');
+    const hh=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    log.unshift([`Hoy ${hh}`, actor, accion]);
+    localStorage.setItem('psico_audit_v1', JSON.stringify(log.slice(0,30)));
+  }catch(e){}
+}
 // Stores compartidos (persisten en el navegador durante la demo/pilotaje).
 const SALUD_KEY='psico_salud_v1';
 function saludLoad(){ try{ const s=JSON.parse(localStorage.getItem(SALUD_KEY)||'null'); return s||JSON.parse(JSON.stringify(SALUD_SEED)); }catch(e){ return JSON.parse(JSON.stringify(SALUD_SEED)); } }
