@@ -711,11 +711,13 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const neeCount={}; roster.forEach(e=>{ if(enSeguimiento(e,inf.data,revisiones,seg)){ const c=normCurso(e.curso); neeCount[c]=(neeCount[c]||0)+1; } });
   const totalNEE = roster.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)).length;
   const totalMat = roster.length;
+  const planesVigentes = (revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado').length;
+  const porEvaluar = nuevos.length;
 
   return (
     <div style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 50px' }} className="fade">
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
-        {[['En seguimiento NEE', String(totalNEE), `de ${totalMat} matriculados`],['Planes vigentes','3',''],['Por evaluar', String(nuevos.length||1),'']].map(([l,v,sub])=>(
+        {[['En seguimiento NEE', String(totalNEE), `de ${totalMat} matriculados`],['Planes vigentes',String(planesVigentes),''],['Por evaluar', String(porEvaluar),'']].map(([l,v,sub])=>(
           <div key={l} style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'14px 16px' }}>
             <div style={{ fontFamily:t.display, fontSize:30, fontWeight:700, color:t.primary }}>{v}</div>
             <div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{l}</div>
