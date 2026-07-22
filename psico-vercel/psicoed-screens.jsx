@@ -523,6 +523,15 @@ function nivelAlerta(s){
 
 // ─── Carga de nómina (importación masiva) ────────────────────────
 const normCurso=(c)=>String(c||'').replace(/\s*B[áa]sico|\s*Medio/i,'').replace(/\s/g,'');
+// Código de vinculación por estudiante (determinista: mismo alumno → mismo código).
+// El equipo lo ve en la ficha; el apoderado debe ingresarlo para vincular. 6 caracteres.
+function codigoVinculacion(est){
+  const base=String((est&&(est.rut||''))||'')+'|'+String((est&&est.id)||'')+'|CMPE2026';
+  let h=0; for(let i=0;i<base.length;i++){ h=(h*31 + base.charCodeAt(i))>>>0; }
+  const AB='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let out='';
+  for(let i=0;i<6;i++){ out+=AB[h%AB.length]; h=Math.floor(h/AB.length)+ (h%7)*131; }
+  return out;
+}
 // Curso desde un título tipo "SÉPTIMO BÁSICO A" → "7°A"
 const ORD_BASE={ 'PRIMERO':'1','SEGUNDO':'2','TERCERO':'3','CUARTO':'4','QUINTO':'5','SEXTO':'6','SEPTIMO':'7','SÉPTIMO':'7','OCTAVO':'8' };
 const ORD_MEDIO={ 'PRIMERO':'I','SEGUNDO':'II','TERCERO':'III','CUARTO':'IV' };
@@ -1095,7 +1104,17 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
         </div>
       </div>
 
-      {/* seguimiento NEE (activar/quitar manual) */}
+      {/* código de vinculación para el apoderado */}
+      <div style={{ background:t.soft, border:`1px dashed ${t.primary}`, borderRadius:t.radius, padding:'11px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:12 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:11, fontWeight:800, color:t.primaryDark }}>Código de vinculación del apoderado</div>
+          <div style={{ fontSize:10, color:t.muted, marginTop:2, lineHeight:1.4 }}>Entrégalo al apoderado. Lo necesita (junto al RUT) para vincularse con {est.nombre.split(' ')[0]} y ver solo su información.</div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+          <span style={{ fontFamily:'monospace', fontSize:20, fontWeight:800, letterSpacing:3, color:t.ink }}>{codigoVinculacion(est)}</span>
+          <button onClick={()=>{ try{ navigator.clipboard.writeText(codigoVinculacion(est)); onToast('Código copiado: '+codigoVinculacion(est)); }catch(e){ onToast('Código: '+codigoVinculacion(est)); } }} title="Copiar" style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:8, padding:'6px 8px', cursor:'pointer' }}><Icon k="doc" c={t.primary} s={15} /></button>
+        </div>
+      </div>
       <div style={{ background:seguido?t.soft:t.card, border:`1px solid ${seguido?t.primary:t.border}`, borderRadius:t.radius, padding:'11px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
         <div style={{ flex:1, minWidth:180 }}>
           <div style={{ fontSize:12, fontWeight:800, color:seguido?t.primaryDark:t.ink }}>{seguido?'En seguimiento NEE':'En el directorio (sin seguimiento NEE)'}</div>
@@ -2045,7 +2064,11 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
   const [rutBusca,setRutBusca]=useState('');
   const [vinculando,setVinculando]=useState(false);
   const [pin,setPin]=useState('');
-  const vincular=(e)=>{ if(hijos.some(h=>h.id===e.id)){ setHijo(e.id); setVinculando(false); setRutBusca(''); return; } setHijos(p=>[...p,{ id:e.id, nombre:e.nombre, curso:e.curso }]); setHijo(e.id); setVinculando(false); setRutBusca(''); };
+  const [candidato,setCandidato]=useState(null); // estudiante elegido, esperando código
+  const [codigoInput,setCodigoInput]=useState('');
+  const [codigoErr,setCodigoErr]=useState(false);
+  const confirmarVinculo=()=>{ if(!candidato) return; const ok=String(codigoInput||'').trim().toUpperCase()===codigoVinculacion(candidato); if(!ok){ setCodigoErr(true); return; } if(!hijos.some(h=>h.id===candidato.id)){ setHijos(p=>[...p,{ id:candidato.id, nombre:candidato.nombre, curso:candidato.curso }]); } setHijo(candidato.id); setCandidato(null); setCodigoInput(''); setCodigoErr(false); setVinculando(false); setRutBusca(''); };
+  const vincular=(e)=>{ if(hijos.some(h=>h.id===e.id)){ setHijo(e.id); setVinculando(false); setRutBusca(''); return; } setCandidato(e); setCodigoInput(''); setCodigoErr(false); };
   const desvincular=(id)=>setHijos(p=>p.filter(h=>h.id!==id));
   const buscaHijo=(q)=>{ const s=q.trim(); if(!s) return []; const porRut=normRut(s); if(porRut.length<3) return []; return rosterApo.filter(e=> e.rut && normRut(e.rut).includes(porRut)).slice(0,20); };
   const conDoc = (revisiones||[]).find(r=>HIJOS.some(h=>h.id===r.estId));
@@ -2083,10 +2106,27 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
 
   return (
     <div style={{ maxWidth:560, margin:'0 auto', padding:'16px 16px 50px' }} className="fade">
+      {candidato && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(20,30,26,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:400, padding:20 }} onClick={()=>{ setCandidato(null); setCodigoErr(false); }}>
+          <div onClick={ev=>ev.stopPropagation()} style={{ background:'#fff', borderRadius:16, maxWidth:400, width:'100%', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }} className="scale">
+            <div style={{ background:t.primary, color:'#fff', padding:'14px 18px', fontSize:14.5, fontWeight:800 }}>Verifica tu vínculo</div>
+            <div style={{ padding:'18px 18px 20px' }}>
+              <div style={{ fontSize:12.5, color:t.ink, lineHeight:1.5, marginBottom:4 }}>Vas a vincularte con <b>{candidato.nombre}</b> · {candidato.curso}.</div>
+              <div style={{ fontSize:11.5, color:t.muted, lineHeight:1.5, marginBottom:12 }}>Ingresa el <b>código de vinculación</b> de 6 caracteres que te entregó el colegio (equipo psicoeducativo).</div>
+              <input autoFocus value={codigoInput} onChange={e=>{ setCodigoInput(e.target.value.toUpperCase()); setCodigoErr(false); }} onKeyDown={e=>{ if(e.key==='Enter') confirmarVinculo(); }} placeholder="Ej: K7M2QP" maxLength={6} style={{ width:'100%', padding:'12px 13px', borderRadius:10, border:`1.5px solid ${codigoErr?'#B23A24':t.border}`, fontSize:18, fontWeight:800, letterSpacing:4, textAlign:'center', textTransform:'uppercase', outline:'none', color:t.ink }} />
+              {codigoErr && <div style={{ fontSize:11, color:'#B23A24', fontWeight:700, marginTop:7 }}>Código incorrecto. Verifícalo con el colegio.</div>}
+              <div style={{ display:'flex', gap:9, marginTop:16 }}>
+                <button onClick={()=>{ setCandidato(null); setCodigoErr(false); }} style={{ flex:1, padding:11, background:t.soft, color:t.muted, border:'none', borderRadius:11, fontSize:12.5, fontWeight:700, cursor:'pointer' }}>Cancelar</button>
+                <button onClick={confirmarVinculo} disabled={codigoInput.trim().length<6} style={{ flex:1.4, padding:11, background:codigoInput.trim().length<6?t.soft:t.primary, color:codigoInput.trim().length<6?t.muted:'#fff', border:'none', borderRadius:11, fontSize:12.5, fontWeight:700, cursor:codigoInput.trim().length<6?'default':'pointer' }}>Vincular</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {HIJOS.length===0 ? (
         <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'20px 18px', marginTop:20 }} className="scale">
           <div style={{ fontFamily:t.display, fontSize:18, fontWeight:700, color:t.ink, marginBottom:4 }}>Vincula a tu estudiante</div>
-          <div style={{ fontSize:12, color:t.muted, marginBottom:14, lineHeight:1.5 }}>Ingresa el <b>RUT</b> de tu hijo/a tal como está en el colegio, con guion y dígito verificador. <span style={{ color:t.primaryDark, fontWeight:700 }}>Ejemplo: 22478365-2</span>. Solo verás la información de tu estudiante.</div>
+          <div style={{ fontSize:12, color:t.muted, marginBottom:14, lineHeight:1.5 }}>Ingresa el <b>RUT</b> de tu hijo/a tal como está en el colegio, con guion y dígito verificador. <span style={{ color:t.primaryDark, fontWeight:700 }}>Ejemplo: 22478365-2</span>. Luego pediremos el <b>código de vinculación</b> que te entrega el colegio. Solo verás la información de tu estudiante.</div>
           <input value={rutBusca} onChange={e=>setRutBusca(e.target.value)} placeholder="Ej: 22478365-2" style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', background:t.card, color:t.ink }} />
           <div style={{ display:'flex', flexDirection:'column', gap:7, marginTop:10, maxHeight:280, overflowY:'auto' }}>
             {buscaHijo(rutBusca).map(e=>(
