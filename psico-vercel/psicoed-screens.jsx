@@ -706,8 +706,10 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   if(sel) return <FichaEstudiante t={t} est={sel} onBack={()=>setSel(null)} onToast={show} toast={toast} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />;
   if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} revisiones={revisiones} onBack={()=>setCurso(null)} onSel={setSel} />;
 
+  const estaGestionado = (n)=> (revisiones||[]).some(r=>r.estId===n.estId && (r.estado==='firmado'||r.estado==='archivado'));
   const nuevos = notifs.filter(n=>n.estado==='nuevo');
-  const gestionados = notifs.filter(n=>n.estado!=='nuevo');
+  const bandeja = notifs.filter(n=>!estaGestionado(n)); // pendientes: nuevo + en proceso
+  const gestionados = notifs.filter(estaGestionado);
   const neeCount={}; roster.forEach(e=>{ if(enSeguimiento(e,inf.data,revisiones,seg)){ const c=normCurso(e.curso); neeCount[c]=(neeCount[c]||0)+1; } });
   const totalNEE = roster.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)).length;
   const totalMat = roster.length;
@@ -742,11 +744,11 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
         <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Informes recibidos de apoderados</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:12 }}>Documentos pendientes de procesar. Al procesar uno, se crea o actualiza la ficha del estudiante.</div>
-          {nuevos.length===0 ? (
+          {bandeja.length===0 ? (
             <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:30, textAlign:'center', color:t.muted, fontSize:12.5 }}>No hay informes pendientes. ¡Todo al día! ✓</div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {Object.entries(nuevos.reduce((acc,n)=>{ (acc[n.curso]=acc[n.curso]||[]).push(n); return acc; },{}))
+              {Object.entries(bandeja.reduce((acc,n)=>{ (acc[n.curso]=acc[n.curso]||[]).push(n); return acc; },{}))
                 .sort((a,b)=>a[0].localeCompare(b[0]))
                 .map(([curso,items])=>(
                 <div key={curso}>
@@ -763,8 +765,9 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
                           <div style={{ fontSize:12.5, fontWeight:600, color:t.ink }}>{n.doc}</div>
                           <div style={{ fontSize:10.5, color:t.muted, marginTop:1 }}>{n.from} · {n.fecha}</div>
                         </div>
-                        <button onClick={()=>{ setNotifs(p=>p.map(x=>x.id===n.id?{...x,estado:'visto'}:x)); setSel(ESTUDIANTES.find(e=>e.id==='e4')); }}
-                          style={{ background:t.primary, color:'#fff', border:'none', borderRadius:9, padding:'8px 14px', fontSize:11.5, fontWeight:700, cursor:'pointer', flexShrink:0 }}>Procesar →</button>
+                        {n.estado==='en_proceso' && <span style={{ background:'#E8F0FB', color:'#2563B8', fontSize:9.5, fontWeight:800, padding:'2px 8px', borderRadius:99, flexShrink:0 }}>En proceso</span>}
+                        <button onClick={()=>{ setNotifs(p=>p.map(x=>x.id===n.id?{...x,estado:'en_proceso'}:x)); const e=roster.find(r=>r.id===n.estId); if(e) setSel(e); }}
+                          style={{ background:n.estado==='en_proceso'?t.soft:t.primary, color:n.estado==='en_proceso'?t.primaryDark:'#fff', border:'none', borderRadius:9, padding:'8px 14px', fontSize:11.5, fontWeight:700, cursor:'pointer', flexShrink:0 }}>{n.estado==='en_proceso'?'Continuar →':'Procesar →'}</button>
                       </div>
                     ))}
                   </div>
@@ -862,7 +865,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
                   </button>
                 );})}
               </div>
-              <div style={{ fontSize:9.5, color:t.muted, marginTop:12, lineHeight:1.5 }}>Las señales provienen de datos individuales de esta app (no de la evaluación grupal del viernes). Toca un estudiante para abrir su ficha.</div>
+              <div style={{ fontSize:9.5, color:t.muted, marginTop:12, lineHeight:1.5 }}>Las señales provienen de la información registrada en esta app (informes, planes y seguimiento). Toca un estudiante para abrir su ficha.</div>
             </React.Fragment>);
           })()}
         </div>
@@ -1027,10 +1030,11 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const esNEE = !est.sinNee;
   const [tab,setTab]=useState(esNEE?'resumen':'academico');
   const TABS = esNEE ? [['resumen','Resumen'],['documentos','Documentos'],['academico','Plan académico'],['nee','Plan NEE · Firmas']] : [['academico','Plan de trabajo académico']];
-  // gestión del caso (demo)
-  const [caso,setCaso]=useState({ responsable:'', revision:'', entrevistas: PILOTO ? [] : [
+  // gestión del caso — persistida por estudiante
+  const [caso,setCaso]=useState(()=>{ const all=lsGet('psico_caso_v1',{}); if(all[est.id]) return all[est.id]; return { responsable:'', revision:'', entrevistas: PILOTO ? [] : [
     { fecha:'15 may 2026', nota:'Reunión inicial con apoderado. Acuerdos de apoyo en casa.' },
-  ] });
+  ] }; });
+  useEffect(()=>{ const all=lsGet('psico_caso_v1',{}); all[est.id]=caso; lsSet('psico_caso_v1',all); },[caso,est.id]);
   const [entTxt,setEntTxt]=useState('');
   const addEntrevista=()=>{ if(!entTxt.trim())return; setCaso(c=>({...c, entrevistas:[...c.entrevistas, { fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), nota:entTxt.trim() }]})); setEntTxt(''); onToast('✓ Entrevista registrada'); };
   const DIAG_PLANTILLAS = {
@@ -1125,7 +1129,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
           <div style={{ width:52, height:52, borderRadius:14, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, fontSize:18 }}>{est.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
           <div style={{ flex:1 }}>
             <div style={{ fontFamily:t.display, fontSize:19, fontWeight:600, color:t.ink }}>{est.nombre}</div>
-            <div style={{ fontSize:11.5, color:t.muted, marginTop:2 }}>{est.curso}{esNEE?` · ${est.edad} · ${est.diag}`:' · Plan de trabajo académico'}</div>
+            <div style={{ fontSize:11.5, color:t.muted, marginTop:2 }}>{est.curso}{est.rut?` · ${est.rut}`:''}{esNEE && (est.diag||est.edad)?` · ${[est.edad,est.diag].filter(Boolean).join(' · ')}`:''}</div>
           </div>
           {esNEE && (tieneInforme
             ? <button onClick={()=>setVerInforme(true)} style={{ flexShrink:0, background:t.soft, color:t.primaryDark, border:'none', borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}><Icon k="doc" c={t.primary} s={16} />Ver informe médico</button>
