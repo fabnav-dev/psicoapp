@@ -1387,7 +1387,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
             <div style={{ padding:'16px 18px' }}>
               <SectTitle t={t}>Identificación del estudiante</SectTitle>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'9px 14px', marginBottom:18 }}>
-                {[['Nombre',est.nombre],['Curso',est.curso],['Edad',datos.edad||est.edad],['Diagnóstico',datos.diag||est.diag],['Establecimiento','Colegio Mayor Peñalolén'],['Fecha elaboración','17 jun 2026']].map(([k,v])=>(
+                {[['Nombre',est.nombre],['Curso',est.curso],['Edad',datos.edad||est.edad],['Diagnóstico',datos.diag||est.diag],['Establecimiento','Colegio Mayor Peñalolén'],['Fecha elaboración',new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'})]].map(([k,v])=>(
                   <div key={k}>
                     <div style={{ fontSize:9.5, fontWeight:700, color:t.muted, textTransform:'uppercase', letterSpacing:0.5 }}>{k}</div>
                     {modo==='manual'
@@ -1814,6 +1814,9 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
   const _edad = _dd.edad || est.edad || '';
   const _diag = _dd.diag || est.diag || '';
   if(!director && _dd.director) director = _dd.director;
+  const _hoy = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'});
+  const _elab = (fechaElab && fechaElab!=='17 jun 2026') ? fechaElab : _hoy;
+  const _recInforme = ((lsGet('psico_informe_v1',{})[est.id]||{}).fecha) || _elab;
   const equipoRoles=['Profesor/a Tutor/a','Psicólogo/a','Educador/a Diferencial','Terapeuta Ocupacional','Psicólogo/a de Convivencia'];
   const equipoSel=(equipo&&Object.keys(equipo).some(k=>equipo[k]))?equipoRoles.filter(r=>equipo[r]):equipoRoles;
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -1846,7 +1849,7 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
       <td>${g.items.map((it,ii)=>{ const on = marcadas[gi+'-'+ii]; return `<div class="it">${on?'<span class="bx on">&#10003;</span>':'<span class="bx"></span>'} ${esc(it)}</div>`; }).join('')}</td>
       <td class="resp">${respCols.map((r,ri)=>{ const on=resp[gi+'-'+ri]; return `<div class="it">${on?'<span class="bx on">&#10003;</span>':'<span class="bx"></span>'} ${esc(r)}</div>`; }).join('')}</td>
     </tr>`).join('');
-  const idItems=[['Nombre',est.nombre||(rev&&rev.estNombre)||''],['Fecha de nacimiento',_nacimiento],['Edad cronológica',_edad],['Curso',est.curso||(rev&&rev.curso)||''],['Establecimiento','Colegio Mayor Peñalolén'],['Director/a de Ciclo',director||'______________'],['Diagnóstico',_diag],['Fecha de elaboración',fechaElab||'____ / ____ / 2026']];
+  const idItems=[['Nombre',est.nombre||(rev&&rev.estNombre)||''],['Fecha de nacimiento',_nacimiento],['Edad cronológica',_edad],['Curso',est.curso||(rev&&rev.curso)||''],['Establecimiento','Colegio Mayor Peñalolén'],['Director/a de Ciclo',director||'______________'],['Diagnóstico',_diag],['Fecha de elaboración',_elab]];
   const tituloAdec = esPAEC ? 'ADECUACIONES EVALUATIVAS' : 'ADECUACIONES CURRICULARES DE ACCESO';
   const firmasBase = esPSM
     ? ['Apoderado(a)','Profesor(a) Tutor(a)','Educador(a) Diferencial','Psicóloga','Terapeuta Ocupacional','Director(a) de Ciclo']
@@ -1892,7 +1895,7 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
     .bx{ display:inline-block; width:11px; height:11px; border:1px solid #555; border-radius:2px; flex-shrink:0; margin-top:1px; text-align:center; line-height:10px; font-size:9px; }
     .bx.on{ background:#2E8A95; color:#fff; border-color:#2E8A95; }
     .eq{ display:flex; flex-wrap:wrap; gap:7px; } .eq span{ border:1px solid #b9c2d0; border-radius:4px; padding:4px 12px; font-weight:600; }
-    .obs{ border:1px solid #b9c2d0; min-height:46px; padding:7px 9px; page-break-inside:avoid; break-inside:avoid; overflow:visible; } .inl .bx{ vertical-align:middle; } .p{ margin:4px 0; } .ul{ margin:4px 0 4px 16px; } .ul li{ margin-bottom:3px; }
+    .obs{ border:1px solid #b9c2d0; min-height:46px; padding:7px 9px; overflow:visible; } .inl .bx{ vertical-align:middle; } .p{ margin:4px 0; } .ul{ margin:4px 0 4px 16px; } .ul li{ margin-bottom:3px; }
     .firmas{ margin-top:34px; display:flex; flex-wrap:wrap; gap:26px 40px; justify-content:space-between; }
     .firmas div{ width:28%; text-align:center; border-top:1px solid #555; padding-top:5px; font-size:9.5px; }
     .firmas .sig{ border-top:1px solid #1E7A53; position:relative; }
@@ -1910,7 +1913,7 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
   <h2>ACTA DE CONOCIMIENTO – INFORME EXTERNO</h2>
   <table class="idt"><tbody>
     <tr><td class="k">Profesional externo</td><td>Según informe adjunto</td></tr>
-    <tr><td class="k">Fecha de recepción del informe</td><td>${esc(fechaElab||'____ / ____ / 2026')}</td></tr>
+    <tr><td class="k">Fecha de recepción del informe</td><td>${esc(_recInforme)}</td></tr>
     <tr><td class="k">Fecha de actualización del informe</td><td>______________</td></tr>
     <tr><td class="k">Sugerencias externas</td><td>Incorporadas en las adecuaciones del presente plan</td></tr>
     <tr><td class="k">Decisión equipo de ciclo</td><td>${esPSM ? 'Se ajustará el calendario de todas las asignaturas con la flexibilidad necesaria.' : 'Estrategias a aplicar por el cuerpo docente, según se detalla a continuación'}</td></tr>
