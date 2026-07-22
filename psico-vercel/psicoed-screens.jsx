@@ -2236,7 +2236,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
       ) : (<React.Fragment>
       <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'15px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:12 }}>
         <div style={{ width:44, height:44, borderRadius:12, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center' }}><Icon k="apoderado" c={t.primary} s={24} /></div>
-        <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:t.ink }}>Hola</div><div style={{ fontSize:11, color:t.muted }}>Apoderado/a{hijoSel?' · '+hijoSel.curso:''}</div></div>
+        <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:t.ink }}>Hola{(window.PSICO_USER&&window.PSICO_USER.nombre)?', '+window.PSICO_USER.nombre.split(' ')[0]:''}</div><div style={{ fontSize:11, color:t.muted }}>Apoderado/a{hijoSel?' · '+hijoSel.curso:''}</div></div>
         {HIJOS.length>1 && (
           <select value={hijo||''} onChange={e=>setHijo(e.target.value)} style={{ flexShrink:0, padding:'8px 10px', borderRadius:9, border:`1px solid ${t.border}`, fontSize:11.5, fontWeight:700, color:t.ink, background:t.card }}>
             {HIJOS.map(h=><option key={h.id} value={h.id}>{h.nombre.split(' ')[0]}</option>)}
