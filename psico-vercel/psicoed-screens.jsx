@@ -1172,11 +1172,14 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
 
       {tab==='resumen' && (<React.Fragment>
       {/* trayectoria del estudiante */}
-      {TRAYECTORIA[est.id] && (()=>{
-        const base=TRAYECTORIA[est.id].slice();
-        const vivos=(revisiones||[]).filter(r=>r.estId===est.id && (r.estado==='firmado'||r.estado==='archivado'))
-          .map(r=>({ a:'2026', t:r.estado==='archivado'?(r.planNombre+' finalizado'):(r.planNombre+' firmado por apoderado'), d:r.estado==='archivado'?('Firmado por el equipo · Folio '+(r.folio||'')):('En ronda de firmas del equipo'), k:r.estado==='archivado'?'hito':'plan', vivo:true }));
+      {(()=>{
+        const base=(TRAYECTORIA[est.id]||[]).slice();
+        const rec = inf.data[est.id];
+        if(rec && (rec.dataUrl||rec.path)) base.push({ a:'2026', t:'Informe recibido', d:`${/apoderado/i.test(rec.origen||'')?'Enviado por el apoderado':'Cargado por el equipo'} · ${rec.nombre||'Informe'}${rec.fecha?' · '+rec.fecha:''}`, k:'doc' });
+        const vivos=(revisiones||[]).filter(r=>r.estId===est.id)
+          .map(r=>{ const m={ en_revision:['Plan enviado a revisión','En revisión del apoderado','plan'], cambios:['Cambios solicitados por el apoderado','El equipo está ajustando el plan','alerta'], respondido:['Respuesta enviada al apoderado','Requiere entrevista','plan'], firmado:[r.planNombre+' firmado por apoderado','En ronda de firmas del equipo','plan'], archivado:[r.planNombre+' finalizado','Firmado por el equipo · Folio '+(r.folio||''),'hito'] }[r.estado]||[r.planNombre+' en elaboración','Borrador del equipo','plan']; return { a:'2026', t:m[0], d:m[1], k:m[2], vivo:['firmado','archivado','cambios'].includes(r.estado) }; });
         const hitos=[...base,...vivos];
+        if(hitos.length===0) return null;
         return (
         <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:16, marginBottom:12 }}>
           <div style={{ fontSize:12.5, fontWeight:800, color:t.ink, marginBottom:3 }}>Trayectoria del estudiante</div>
