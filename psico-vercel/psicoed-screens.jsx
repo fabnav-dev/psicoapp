@@ -2,7 +2,8 @@
 const { useState, useEffect, useMemo, useRef } = React;
 
 // ─── Datos demo ──────────────────────────────────────────────────
-const ESTUDIANTES = [
+const PILOTO = !!(typeof window!=='undefined' && window.PSICO_PILOTO);
+const ESTUDIANTES = PILOTO ? [] : [
   { id:'e1', nombre:'Sofía Contreras', curso:'3°A Básico', diag:'TEA (Trastorno del Espectro Autista)', plan:'PACI', estado:'vigente', edad:'8 años', prof:'Educ. Diferencial', avance:100 },
   { id:'e2', nombre:'Benjamín Soto', curso:'5°B Básico', diag:'TDAH combinado', plan:'PAI', estado:'borrador', edad:'10 años', prof:'Psicología', avance:60 },
   { id:'e3', nombre:'Isidora Vera', curso:'I°A Medio', diag:'Trastorno ansioso', plan:'Plan Salud Mental', estado:'vigente', edad:'14 años', prof:'Psicología', avance:100 },
@@ -153,7 +154,7 @@ function useInforme(){
   return { data, cargar, quitar };
 }
 // Los estudiantes de demostración (seed e1..e5) traen informe cargado; los agregados manualmente, no.
-function esSeedDemo(est){ return /^e\d+$/.test(String((est&&est.id)||'')); }
+function esSeedDemo(est){ if(PILOTO) return false; return /^e\d+$/.test(String((est&&est.id)||'')); }
 
 // ─── Seguimiento NEE ─────────────────────────────────────────────
 // Un estudiante entra al "caseload" NEE cuando: (B3) tiene informe o plan/revisión,
@@ -498,7 +499,7 @@ const CURSO_GRID = {
 // nº de estudiantes con NEE por curso (demo)
 const NEE_POR_CURSO = { '3°A':1, '5°B':2, '7°A':1, 'I°A':1 };
 // trayectoria del estudiante a través de los años (demo)
-const TRAYECTORIA = {
+const TRAYECTORIA = PILOTO ? {} : {
   e1:[ {a:'2023',t:'Ingreso al programa',d:'Derivación por sospecha TEA',k:'doc'},{a:'2024',t:'Diagnóstico TEA',d:'Informe neurología confirma TEA nivel 1',k:'diag'},{a:'2024',t:'Primer PACI',d:'Adecuaciones de acceso y currículo',k:'plan'},{a:'2025',t:'Avance significativo',d:'Mejora en autorregulación y vínculo con pares',k:'hito'},{a:'2026',t:'PACI vigente',d:'Plan renovado y firmado',k:'plan'} ],
   e2:[ {a:'2024',t:'Ingreso al programa',d:'Derivación del profesor tutor',k:'doc'},{a:'2025',t:'Diagnóstico TDAH',d:'TDAH combinado, inicio de tratamiento',k:'diag'},{a:'2025',t:'Primer PAI',d:'Apoyos de organización y tiempo',k:'plan'},{a:'2026',t:'En seguimiento',d:'Adherencia docente irregular, requiere atención',k:'alerta'} ],
   e3:[ {a:'2025',t:'Ingreso al programa',d:'Derivación por crisis de ansiedad',k:'doc'},{a:'2025',t:'Trastorno ansioso',d:'Informe psiquiatría',k:'diag'},{a:'2025',t:'Plan Salud Mental',d:'Contención y flexibilización',k:'plan'},{a:'2026',t:'Requiere revisión',d:'Plan vencido, baja adherencia',k:'alerta'} ],
@@ -1024,7 +1025,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const [tab,setTab]=useState(esNEE?'resumen':'academico');
   const TABS = esNEE ? [['resumen','Resumen'],['documentos','Documentos'],['academico','Plan académico'],['nee','Plan NEE · Firmas']] : [['academico','Plan de trabajo académico']];
   // gestión del caso (demo)
-  const [caso,setCaso]=useState({ responsable:'', revision:'', entrevistas:[
+  const [caso,setCaso]=useState({ responsable:'', revision:'', entrevistas: PILOTO ? [] : [
     { fecha:'15 may 2026', nota:'Reunión inicial con apoderado. Acuerdos de apoyo en casa.' },
   ] });
   const [entTxt,setEntTxt]=useState('');
@@ -2079,10 +2080,12 @@ function ProfesorDashboard({ t }){
 // ════════════════ APODERADO ═════════════════════════════════════
 function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarCambios }){
   const [phase,setPhase]=useState('idle'); // idle | uploading | done
-  const [hist,setHist]=useState([{ doc:'Informe Fonoaudiología.pdf', fecha:'12 mar 2026', estado:'Procesado' }]);
+  const [hist,setHist]=useState(()=> (typeof window!=='undefined'&&window.PSICO_PILOTO) ? [] : [{ doc:'Informe Fonoaudiología.pdf', fecha:'12 mar 2026', estado:'Procesado' }]);
   const [revisando,setRevisando]=useState(null); // documento en pantalla de revisión
-  const [hijos,setHijos]=useState(()=>lsGet('psico_apo_hijos_v1',[]));
-  useEffect(()=>{ lsSet('psico_apo_hijos_v1', hijos); },[hijos]);
+  // Hijos vinculados: PRIVADOS por cuenta de apoderado (no se comparten en la nube del colegio)
+  const apoKey = 'psico_apo_hijos_'+((window.PSICO_USER&&window.PSICO_USER.id)||'anon');
+  const [hijos,setHijos]=useState(()=>{ const v=lsGet(apoKey,null); return v!=null ? v : lsGet('psico_apo_hijos_v1_migold',[]); });
+  useEffect(()=>{ lsSet(apoKey, hijos); },[hijos]);
   const HIJOS = hijos;
   const rosterApo=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
   const normRut=(s)=>String(s||'').replace(/[.\s]/g,'').toLowerCase();

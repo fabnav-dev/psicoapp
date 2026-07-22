@@ -55,6 +55,8 @@ window.PSICO_SB = sb; // expuesto para subir/leer informes desde Storage (bucket
 const WORKSPACE = PSICO_SUPA.workspace || 'colegio';
 // Todas las claves de datos que ya guarda la capa 1 en localStorage
 const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1','psico_seg_v1','psico_salud_v1','psico_desreg_v1','psico_adh_v1'];
+// NOTA: 'psico_apo_hijos_v1' NO se sincroniza al bloque del colegio — los hijos
+// vinculados son PRIVADOS por cuenta de apoderado (se guardan por usuario).
 const ROLES = [
   { id:'equipo',    label:'Equipo Psicoeducativo' },
   { id:'profesor',  label:'Profesor(a)' },
@@ -214,14 +216,14 @@ function App(){
   // ── Capa 2: sesión + sincronización con la nube ──
   const [session, setSession] = useState(null);
   const [cloudReady, setCloudReady] = useState(!CLOUD_ON);
-  useEffect(()=>{ if(!CLOUD_ON) return; sb.auth.getSession().then(({data})=>setSession(data.session)); const {data:sub}=sb.auth.onAuthStateChange((_e,s)=>setSession(s)); return ()=>sub.subscription.unsubscribe(); },[]);
+  useEffect(()=>{ if(!CLOUD_ON) return; sb.auth.getSession().then(({data})=>{ setSession(data.session); window.PSICO_USER = data.session ? { id:data.session.user.id, email:data.session.user.email } : null; }); const {data:sub}=sb.auth.onAuthStateChange((_e,s)=>{ setSession(s); window.PSICO_USER = s ? { id:s.user.id, email:s.user.email } : null; }); return ()=>sub.subscription.unsubscribe(); },[]);
   useEffect(()=>{ if(!CLOUD_ON) return; if(!session){ setCloudReady(false); return; } let vivo=true; (async()=>{ await cloudLoad(); if(!vivo) return; setNotifs(LS.get('psico_notifs_v1', [])); setRevisiones(LS.get('psico_revisiones_v1', [])); const r=(session.user.user_metadata||{}).role||null; const eff = role || r; if(eff) setRole(eff); setScreen(eff?'app':'onboarding'); setCloudReady(true); })(); return ()=>{ vivo=false; }; },[session]);
   useEffect(()=>{ if(!CLOUD_ON||!session||!cloudReady) return; let tmr; const h=()=>{ clearTimeout(tmr); tmr=setTimeout(cloudSave,800); }; window.addEventListener('psico-cloud-dirty',h); window.addEventListener('pta-change',h); window.addEventListener('inf-change',h); return ()=>{ window.removeEventListener('psico-cloud-dirty',h); window.removeEventListener('pta-change',h); window.removeEventListener('inf-change',h); clearTimeout(tmr); }; },[session,cloudReady]);
   const base = THEMES[theme];
   const t = dark ? { ...base, bg:'#12161C', card:'#1B212B', ink:'#E8ECF2', muted:'#9AA6B6', border:'rgba(255,255,255,0.12)', soft:'#252D39' } : base;
 
   // estado compartido de la demo (notificaciones, informes subidos)
-  const [notifs, setNotifs] = usePersist('psico_notifs_v1', ()=>([
+  const [notifs, setNotifs] = usePersist('psico_notifs_v1', ()=> (window.PSICO_PILOTO ? [] : [
     { id:'n0', from:'Apoderado · Martín Rojas', curso:'5°B', doc:'Informe Neurología.pdf', estado:'nuevo', fecha:'Hoy 09:12' },
     { id:'n1', from:'Apoderado · Camila Torres', curso:'5°B', doc:'Informe Psiquiatría.pdf', estado:'nuevo', fecha:'Hoy 08:50' },
     { id:'n2', from:'Apoderado · Pedro Salas', curso:'1°A', doc:'Informe Fonoaudiología.pdf', estado:'nuevo', fecha:'Hoy 08:32' },
