@@ -1046,6 +1046,9 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
     setMarcadas(m); setPhase('listo'); setModo('manual'); onToast('Plantilla aplicada según diagnóstico');
   };
   const plan=PLANES.find(p=>p.id===planId);
+  const revDe = (pid)=> (revisiones||[]).find(r=>r.estId===est.id && r.planId===pid);
+  const estadoDePlan = (pid)=>{ const rv=revDe(pid); if(!rv) return 'No iniciado'; return { en_revision:'En revisión', cambios:'Cambios solicitados', respondido:'Respondido', firmado:'Firmado', archivado:'Finalizado' }[rv.estado] || 'En elaboración'; };
+  const cambiarPlan = (pid)=>{ setPlanId(pid); const rv=revDe(pid); if(rv){ setPhase('listo'); setModo(rv.modo||'ia'); setMarcadas(rv.marcadas||{}); setObs(rv.obs||''); } else { setPhase('inicio'); setModo(null); setMarcadas({}); setObs(''); } };
   const adecSet = planId==='PAEC' ? ADEC_EVAL : planId==='PSM' ? ADEC_PSM : ADEC_ACCESO;
   // Publica el estudiante abierto para que el Copiloto IA tenga contexto
   useEffect(()=>{
@@ -1196,7 +1199,32 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
         );
       })()}
 
-      {/* salud (registrado por TENS · solo lectura) y desregulación (editable por el equipo) */}
+      {/* documentos del estudiante (#1): informe médico + planes */}
+      {(()=>{
+        const rec = inf.data[est.id] || (esSeedDemo(est)?{nombre:'Informe Neurología.pdf',fecha:'10 jun 2026',origen:'Apoderado'}:null);
+        const planes = (revisiones||[]).filter(r=>r.estId===est.id);
+        if(!rec && planes.length===0) return null;
+        const estLbl={ en_revision:['En revisión del apoderado','#C2841E','#FBF1DE'], cambios:['Cambios solicitados','#B23A24','#FBE6E2'], respondido:['Respondido al apoderado','#2563B8','#E8F0FB'], firmado:['Firmado por apoderado','#185FA5','#E8F0FB'], archivado:['Finalizado y archivado','#1E7A53','#E2F3EC'] };
+        return (
+        <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:16, marginBottom:12 }}>
+          <div style={{ fontSize:12.5, fontWeight:800, color:t.ink, marginBottom:11 }}>Documentos del estudiante</div>
+          {rec && (
+            <div style={{ display:'flex', alignItems:'center', gap:11, padding:'10px 12px', background:t.soft, borderRadius:10, marginBottom:planes.length?8:0 }}>
+              <Icon k="doc" c={DOC_CATS.informe.color} s={19} />
+              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>{rec.nombre||'Informe médico'}</div><div style={{ fontSize:10.5, color:t.muted }}>{/apoderado/i.test(rec.origen||'')?'Recibido del apoderado':'Cargado por el equipo'} · {rec.fecha||'—'}</div></div>
+              <span style={{ fontSize:9.5, fontWeight:800, color:t.primaryDark, background:t.card, padding:'2px 9px', borderRadius:99, flexShrink:0 }}>Informe</span>
+            </div>
+          )}
+          {planes.map(p=>{ const e=estLbl[p.estado]||['En elaboración','#6B6F92',t.soft]; const cat=DOC_CATS[p.planId]||DOC_CATS.informe; return (
+            <div key={p.id} style={{ display:'flex', alignItems:'center', gap:11, padding:'10px 12px', background:t.soft, borderRadius:10, marginTop:8, borderLeft:`4px solid ${cat.color}` }}>
+              <Icon k="doc" c={cat.color} s={19} />
+              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>{p.planNombre||p.planId}</div><div style={{ fontSize:10.5, color:t.muted }}>{p.fecha||''}{p.folio?' · Folio '+p.folio:''}</div></div>
+              <span style={{ fontSize:9.5, fontWeight:800, color:e[1], background:e[2], padding:'2px 9px', borderRadius:99, flexShrink:0 }}>{e[0]}</span>
+            </div>
+          );})}
+        </div>
+        );
+      })()}
       <DesregFicha t={t} estId={est.id} editable />
       <MedFicha t={t} estId={est.id} />
 
@@ -1267,11 +1295,11 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
           {/* planes */}
           {PLANES.map(p=>{
             const cat=DOC_CATS[p.id]; const activo=planId===p.id;
-            const estadoPlan = est.estado==='pendiente' ? 'No iniciado' : (p.id===planId ? (est.estado==='borrador'?'En elaboración':'Gestionado') : 'No iniciado');
-            const tone = estadoPlan==='Gestionado'?'ok':estadoPlan==='En elaboración'?'warn':'soft';
+            const estadoPlan = estadoDePlan(p.id);
+            const tone = (estadoPlan==='Firmado'||estadoPlan==='Finalizado')?'ok':(estadoPlan==='No iniciado'?'soft':'warn');
             return (
               <div key={p.id} style={{ display:'flex', alignItems:'center', gap:0, background:activo?cat.color+'0d':t.card, border:`1px solid ${activo?cat.color:t.border}`, borderLeft:`4px solid ${cat.color}`, borderRadius:12, overflow:'hidden', transition:'all .15s' }}>
-                <button onClick={()=>setPlanId(p.id)} style={{ flex:1, minWidth:0, textAlign:'left', cursor:'pointer', background:'none', border:'none', padding:'11px 13px', display:'flex', alignItems:'center', gap:12 }}>
+                <button onClick={()=>{ setTab('nee'); cambiarPlan(p.id); }} style={{ flex:1, minWidth:0, textAlign:'left', cursor:'pointer', background:'none', border:'none', padding:'11px 13px', display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ width:34, height:34, borderRadius:9, background:cat.color+'1a', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon k={cat.icon} c={cat.color} s={18} /></div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:12.5, fontWeight:700, color:t.ink }}>{p.nombre} · <span style={{ fontWeight:500, color:t.muted }}>{p.full}</span></div>
@@ -1303,7 +1331,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:8 }}>¿Cómo quieres crear la planilla?</div>
           <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
             {PLANES.map(p=>(
-              <button key={p.id} onClick={()=>setPlanId(p.id)} style={{ padding:'7px 14px', borderRadius:99, fontSize:11.5, fontWeight:700, cursor:'pointer', border:`1px solid ${planId===p.id?t.primary:t.border}`, background:planId===p.id?t.primary:t.card, color:planId===p.id?'#fff':t.muted }}>{p.nombre}</button>
+              <button key={p.id} onClick={()=>cambiarPlan(p.id)} style={{ padding:'7px 14px', borderRadius:99, fontSize:11.5, fontWeight:700, cursor:'pointer', border:`1px solid ${planId===p.id?t.primary:t.border}`, background:planId===p.id?t.primary:t.card, color:planId===p.id?'#fff':t.muted }}>{p.nombre}{revDe(p.id)?' ✓':''}</button>
             ))}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -1327,7 +1355,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
         <div className="fade">
           <div style={{ display:'flex', gap:8, marginBottom:12, alignItems:'center', flexWrap:'wrap' }}>
             {PLANES.map(p=>(
-              <button key={p.id} onClick={()=>setPlanId(p.id)} style={{ padding:'7px 14px', borderRadius:99, fontSize:11.5, fontWeight:700, cursor:'pointer', border:`1px solid ${planId===p.id?t.primary:t.border}`, background:planId===p.id?t.primary:t.card, color:planId===p.id?'#fff':t.muted }}>{p.nombre}</button>
+              <button key={p.id} onClick={()=>cambiarPlan(p.id)} style={{ padding:'7px 14px', borderRadius:99, fontSize:11.5, fontWeight:700, cursor:'pointer', border:`1px solid ${planId===p.id?t.primary:t.border}`, background:planId===p.id?t.primary:t.card, color:planId===p.id?'#fff':t.muted }}>{p.nombre}{revDe(p.id)?' ✓':''}</button>
             ))}
             <span style={{ marginLeft:'auto' }}><Chip t={t} label={modo==='manual'?'Manual':'Autocompletado con IA'} tone={modo==='manual'?'soft':'ok'} /></span>
           </div>
@@ -1907,7 +1935,9 @@ function ProfesorDashboard({ t }){
   const [leidos,setLeidos]=useState({});        // {`estId::Asignatura`: fechaConfirmación}
   const [confAsig,setConfAsig]=useState({});     // input de asignatura por estudiante
   const [equipoUpd,setEquipoUpd]=useState({});   // {estId:true} = el equipo actualizó los apoyos
-  const confirmarLectura=(estId)=>{ const a=(confAsig[estId]||'').trim(); if(!a)return; setLeidos(p=>({...p,[estId+'::'+a]:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'})})); setConfAsig(p=>({...p,[estId]:''})); };
+  const confirmarLectura=(estId)=>{ const a=(confAsig[estId]||'').trim(); if(!a)return; setLeidos(p=>({...p,[estId+'::'+a]:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'})})); setConfAsig(p=>({...p,[estId]:''}));
+    // Alimenta la adherencia docente que ve Gestión (psico_adh_v1): por curso [confirmadas, total NEE]
+    try{ const est=rosterProf.find(e=>e.id===estId); if(est){ const cur=normCurso(est.curso); const adh=lsGet('psico_adh_v1',{}); const tot=(neeCountProf[cur]||1); const prev=Array.isArray(adh[cur])?adh[cur][0]:0; adh[cur]=[Math.min(tot,prev+1),tot]; lsSet('psico_adh_v1',adh); } }catch(e){} };
   const simularActualizacion=(estId)=>{ setEquipoUpd(p=>({...p,[estId]:true})); setLeidos(p=>{ const n={...p}; Object.keys(n).forEach(k=>{ if(k.startsWith(estId+'::')) n[k]=null; }); return n; }); };
   // apoyos por asignatura reportados por cada profesor: { [estId]: [{asignatura, profesor, correo, apoyos}] }
   const [apoyosAsig,setApoyosAsig]=useState({});
