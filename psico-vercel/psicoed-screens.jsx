@@ -924,6 +924,28 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   );
 }
 
+// Hoja imprimible de códigos de vinculación por curso (para el equipo)
+function imprimirCodigosCurso(curso, lista){
+  const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const logo = location.origin+location.pathname.replace(/[^/]*$/,'')+'logo-blanco.png';
+  const filas=lista.map((e,i)=>`<tr><td style="text-align:center;color:#888">${i+1}</td><td><b>${esc(e.nombre)}</b></td><td style="text-align:center">${esc(e.rut||'—')}</td><td style="text-align:center;font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px">${codigoVinculacion(e)}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Códigos de vinculación · Curso ${esc(curso)}</title>
+  <style>@page{size:A4;margin:18mm 16mm} *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;color:#1a2b25;margin:0}
+  .head{display:flex;align-items:center;gap:14px;background:#2C7A6B;color:#fff;padding:14px 18px;border-radius:10px}
+  .head img{height:44px} .head h1{font-size:16px;margin:0;font-weight:800} .head p{margin:2px 0 0;font-size:11px;opacity:.9}
+  .nota{background:#F0F6F4;border:1px solid #cfe3dd;border-radius:8px;padding:10px 13px;font-size:10.5px;color:#40554e;margin:14px 0;line-height:1.5}
+  table{width:100%;border-collapse:collapse;font-size:11.5px} th{background:#EAF2EF;color:#2C7A6B;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  td{padding:8px 10px;border-bottom:1px solid #e6ebe9} .ft{margin-top:20px;text-align:center;font-size:8.5px;color:#999;border-top:1px solid #ddd;padding-top:7px}
+  @media print{.noprint{display:none}}</style></head><body>
+  <div class="head"><img src="${logo}" onerror="this.style.display='none'"><div><h1>Códigos de vinculación · Curso ${esc(curso)}</h1><p>Colegio Mayor Peñalolén · App Psicoeducativa</p></div></div>
+  <div class="nota"><b>Uso interno del equipo.</b> Entregue a cada apoderado el código de su estudiante. Junto con el RUT, es lo que necesita para vincularse en la app y ver <b>solo</b> la información de su hijo/a. No difundir la lista completa.</div>
+  <table><thead><tr><th style="width:28px;text-align:center">#</th><th>Estudiante</th><th style="text-align:center">RUT</th><th style="text-align:center">Código</th></tr></thead><tbody>${filas}</tbody></table>
+  <div class="ft">Generado el ${new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})} · ${lista.length} estudiante(s) · Documento confidencial</div>
+  <div class="noprint" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="background:#2C7A6B;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button></div>
+  </body></html>`;
+  const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
+}
+
 // ─── ESTUDIANTES DE UN CURSO ─────────────────────────────────────
 function CursoEstudiantes({ t, curso, extra, revisiones, onBack, onSel }){
   const norm=(c)=>c.replace(/\s*B[áa]sico|\s*Medio/i,'').replace(/\s/g,'');
@@ -935,6 +957,9 @@ function CursoEstudiantes({ t, curso, extra, revisiones, onBack, onSel }){
       <button onClick={onBack} style={{ background:'none', border:'none', color:t.muted, fontSize:12.5, cursor:'pointer', marginBottom:12, fontWeight:600 }}>← Volver a la grilla de cursos</button>
       <div style={{ fontFamily:t.display, fontSize:22, fontWeight:700, color:t.ink, marginBottom:3 }}>Curso {curso}</div>
       <div style={{ fontSize:12, color:t.muted, marginBottom:16 }}>{lista.length} estudiante{lista.length!==1?'s':''} en la nómina · <b style={{ color:t.primary }}>{enSeg}</b> en seguimiento NEE</div>
+      {lista.length>0 && (
+        <button onClick={()=>imprimirCodigosCurso(curso, lista)} style={{ background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7, marginBottom:14 }}><Icon k="doc" c={t.primary} s={16} />Lista de códigos de vinculación (imprimir / PDF)</button>
+      )}
       {lista.length===0 ? (
         <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:30, textAlign:'center', color:t.muted, fontSize:12.5 }}>Este curso no tiene estudiantes en la nómina todavía.</div>
       ) : (
