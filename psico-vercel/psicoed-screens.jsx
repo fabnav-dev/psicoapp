@@ -2802,13 +2802,15 @@ function GestionDashboard({ t, revisiones }){
           </div>
           <div style={{ fontSize:11, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.4, margin:'14px 0 7px' }}>Registro de auditoría reciente</div>
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, overflow:'hidden' }}>
-            {[['Hoy 09:14','Psicóloga','editó ficha de B. Soto (5°B)'],['Hoy 08:50','Orientación','consultó panel de gestión'],['Ayer 16:22','E. Diferencial','firmó documento de I. Vera (I°A)'],['Ayer 11:05','Rectoría','exportó informe a Excel']].map((r,i)=>(
+            {(()=>{ const log=lsGet('psico_audit_v1',[]); if(!log.length) return (
+              <div style={{ padding:'16px', textAlign:'center', color:t.muted, fontSize:11.5 }}>Aún sin registros de auditoría. Se irán registrando los accesos y ediciones de fichas.</div>
+            ); return log.slice(0,8).map((r,i)=>(
               <div key={i} style={{ display:'flex', gap:10, padding:'9px 14px', borderTop:i>0?`1px solid ${t.border}`:'none', fontSize:11 }}>
                 <span style={{ color:t.muted, flexShrink:0, width:74, fontWeight:600 }}>{r[0]}</span>
                 <span style={{ color:t.primary, fontWeight:700, flexShrink:0 }}>{r[1]}</span>
                 <span style={{ color:t.ink }}>{r[2]}</span>
               </div>
-            ))}
+            )); })()}
           </div>
         </div>
       )}
