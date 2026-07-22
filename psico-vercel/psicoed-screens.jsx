@@ -2101,7 +2101,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
   const confirmarVinculo=()=>{ if(!candidato) return; const ok=String(codigoInput||'').trim().toUpperCase()===codigoVinculacion(candidato); if(!ok){ setCodigoErr(true); return; } if(!hijos.some(h=>h.id===candidato.id)){ setHijos(p=>[...p,{ id:candidato.id, nombre:candidato.nombre, curso:candidato.curso }]); } setHijo(candidato.id); setCandidato(null); setCodigoInput(''); setCodigoErr(false); setVinculando(false); setRutBusca(''); };
   const vincular=(e)=>{ if(hijos.some(h=>h.id===e.id)){ setHijo(e.id); setVinculando(false); setRutBusca(''); return; } setCandidato(e); setCodigoInput(''); setCodigoErr(false); };
   const desvincular=(id)=>setHijos(p=>p.filter(h=>h.id!==id));
-  const buscaHijo=(q)=>{ const s=q.trim(); if(!s) return []; const porRut=normRut(s); if(porRut.length<3) return []; return rosterApo.filter(e=> e.rut && normRut(e.rut).includes(porRut)).slice(0,20); };
+  const buscaHijo=(q)=>{ const s=q.trim(); if(!s) return []; const porRut=normRut(s); const porNom=s.toLowerCase(); return rosterApo.filter(e=> (e.rut && porRut.length>=3 && normRut(e.rut).includes(porRut)) || (porNom.length>=3 && String(e.nombre||'').toLowerCase().includes(porNom)) ).slice(0,20); };
   const conDoc = (revisiones||[]).find(r=>HIJOS.some(h=>h.id===r.estId));
   const [hijo,setHijo]=useState(HIJOS[0]?HIJOS[0].id:null);
   useEffect(()=>{ if(!HIJOS.some(h=>h.id===hijo)) setHijo(HIJOS[0]?HIJOS[0].id:null); },[hijos]);
@@ -2158,7 +2158,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
         <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:'20px 18px', marginTop:20 }} className="scale">
           <div style={{ fontFamily:t.display, fontSize:18, fontWeight:700, color:t.ink, marginBottom:4 }}>Vincula a tu estudiante</div>
           <div style={{ fontSize:12, color:t.muted, marginBottom:14, lineHeight:1.5 }}>Ingresa el <b>RUT</b> de tu hijo/a tal como está en el colegio, con guion y dígito verificador. <span style={{ color:t.primaryDark, fontWeight:700 }}>Ejemplo: 22478365-2</span>. Luego pediremos el <b>código de vinculación</b> que te entrega el colegio. Solo verás la información de tu estudiante.</div>
-          <input value={rutBusca} onChange={e=>setRutBusca(e.target.value)} placeholder="Ej: 22478365-2" style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', background:t.card, color:t.ink }} />
+          <input value={rutBusca} onChange={e=>setRutBusca(e.target.value)} placeholder="RUT o nombre (ej: 22478365-2 o Isidora)" style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:13, outline:'none', background:t.card, color:t.ink }} />
           <div style={{ display:'flex', flexDirection:'column', gap:7, marginTop:10, maxHeight:280, overflowY:'auto' }}>
             {buscaHijo(rutBusca).map(e=>(
               <button key={e.id} onClick={()=>vincular(e)} style={{ textAlign:'left', cursor:'pointer', background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'11px 13px', display:'flex', alignItems:'center', gap:11 }}>
@@ -2167,7 +2167,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
                 <span style={{ flexShrink:0, color:t.primary, fontSize:12, fontWeight:800 }}>Vincular</span>
               </button>
             ))}
-            {normRut(rutBusca).length>=3 && buscaHijo(rutBusca).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:14 }}>No se encontró ese RUT en la nómina. Verifícalo con el colegio.</div>}
+            {(normRut(rutBusca).length>=3 || rutBusca.trim().length>=3) && buscaHijo(rutBusca).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:14 }}>No se encontró ese RUT ni nombre en la nómina. Verifícalo con el colegio.</div>}
           </div>
           <div style={{ marginTop:16, paddingTop:12, borderTop:`1px solid ${t.border}` }}>
             <div style={{ fontSize:10.5, color:t.muted, marginBottom:6 }}>¿Eres del equipo y quieres revisar la app? Ingresa el código de revisión.</div>
