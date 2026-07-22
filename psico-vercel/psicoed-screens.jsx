@@ -1007,7 +1007,9 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const [modo,setModo]=useState(revExist?(revExist.modo||'ia'):(est.estado==='pendiente'?null:'ia')); // ia | manual
   const [marcadas,setMarcadas]=useState(()=> revExist&&revExist.marcadas?revExist.marcadas:(est.estado==='pendiente'?{}:seedMarcas()));
   const [resp,setResp]=useState(()=>{ const ex=(revisiones||[]).find(r=>r.estId===est.id && r.resp && Object.keys(r.resp).length); return (ex&&ex.resp)||{}; });
-  const [director,setDirector]=useState('');
+  const [director,setDirector]=useState(()=>{ const d=lsGet('psico_datos_v1',{})[est.id]; return (d&&d.director)||''; });
+  const [datos,setDatos]=useState(()=>{ const d=lsGet('psico_datos_v1',{})[est.id]||{}; return { nacimiento:d.nacimiento||'', edad:d.edad||est.edad||'', diag:d.diag||est.diag||'' }; });
+  useEffect(()=>{ const all=lsGet('psico_datos_v1',{}); all[est.id]={ ...datos, director }; lsSet('psico_datos_v1',all); },[datos,director,est.id]);
   const [obs,setObs]=useState(()=>{ const ex=(revisiones||[]).find(r=>r.estId===est.id && r.obs); return (ex&&ex.obs)||''; });
   const EQUIPO_ROLES=['Profesor/a Tutor/a','Psicólogo/a','Educador/a Diferencial','Terapeuta Ocupacional','Psicólogo/a de Convivencia'];
   const [equipo,setEquipo]=useState(()=>({'Profesor/a Tutor/a':true,'Educador/a Diferencial':true}));
@@ -1437,6 +1439,12 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
               <option value="José Miguel Arriagada R.">José Miguel Arriagada R.</option>
               <option value="Claudia Pantoja H.">Claudia Pantoja H.</option>
             </select>
+            <div style={{ width:'100%', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:9, marginTop:4 }}>
+              <div><label style={{ fontSize:9.5, fontWeight:700, color:t.muted, display:'block', marginBottom:3 }}>Fecha de nacimiento</label><input type="date" value={datos.nacimiento} onChange={e=>setDatos(d=>({...d,nacimiento:e.target.value}))} style={{ width:'100%', padding:'7px 9px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, background:t.card, color:t.ink }} /></div>
+              <div><label style={{ fontSize:9.5, fontWeight:700, color:t.muted, display:'block', marginBottom:3 }}>Edad</label><input value={datos.edad} onChange={e=>setDatos(d=>({...d,edad:e.target.value}))} placeholder="Ej: 12 años" style={{ width:'100%', padding:'7px 9px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, background:t.card, color:t.ink }} /></div>
+              <div><label style={{ fontSize:9.5, fontWeight:700, color:t.muted, display:'block', marginBottom:3 }}>Diagnóstico</label><input value={datos.diag} onChange={e=>setDatos(d=>({...d,diag:e.target.value}))} placeholder="Según informe" style={{ width:'100%', padding:'7px 9px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, background:t.card, color:t.ink }} /></div>
+            </div>
+            <div style={{ width:'100%', fontSize:9.5, color:t.muted }}>Estos datos se imprimen en el documento oficial y los ve el apoderado al descargar.</div>
           </div>
 
           <div style={{ display:'flex', gap:9, flexWrap:'wrap' }}>
@@ -1800,6 +1808,12 @@ function imprimirApoyos(est, curso, tutor, apoyos){
 function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director, equipo, obs, rev, ocultarFecha){
   resp = resp || {};
   if(Object.keys(resp).length===0 && rev && rev.resp) resp = rev.resp;
+  // datos editables del estudiante (los completa el equipo; se comparten a la nube)
+  const _dd = (lsGet('psico_datos_v1',{})[est.id]) || {};
+  const _nacimiento = _dd.nacimiento || '______________';
+  const _edad = _dd.edad || est.edad || '';
+  const _diag = _dd.diag || est.diag || '';
+  if(!director && _dd.director) director = _dd.director;
   const equipoRoles=['Profesor/a Tutor/a','Psicólogo/a','Educador/a Diferencial','Terapeuta Ocupacional','Psicólogo/a de Convivencia'];
   const equipoSel=(equipo&&Object.keys(equipo).some(k=>equipo[k]))?equipoRoles.filter(r=>equipo[r]):equipoRoles;
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -1832,7 +1846,7 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
       <td>${g.items.map((it,ii)=>{ const on = marcadas[gi+'-'+ii]; return `<div class="it">${on?'<span class="bx on">&#10003;</span>':'<span class="bx"></span>'} ${esc(it)}</div>`; }).join('')}</td>
       <td class="resp">${respCols.map((r,ri)=>{ const on=resp[gi+'-'+ri]; return `<div class="it">${on?'<span class="bx on">&#10003;</span>':'<span class="bx"></span>'} ${esc(r)}</div>`; }).join('')}</td>
     </tr>`).join('');
-  const idItems=[['Nombre',est.nombre||(rev&&rev.estNombre)||''],['Fecha de nacimiento','______________'],['Edad cronológica',est.edad],['Curso',est.curso||(rev&&rev.curso)||''],['Establecimiento','Colegio Mayor Peñalolén'],['Director/a de Ciclo',director||'______________'],['Diagnóstico',est.diag],['Fecha de elaboración',fechaElab||'____ / ____ / 2026']];
+  const idItems=[['Nombre',est.nombre||(rev&&rev.estNombre)||''],['Fecha de nacimiento',_nacimiento],['Edad cronológica',_edad],['Curso',est.curso||(rev&&rev.curso)||''],['Establecimiento','Colegio Mayor Peñalolén'],['Director/a de Ciclo',director||'______________'],['Diagnóstico',_diag],['Fecha de elaboración',fechaElab||'____ / ____ / 2026']];
   const tituloAdec = esPAEC ? 'ADECUACIONES EVALUATIVAS' : 'ADECUACIONES CURRICULARES DE ACCESO';
   const firmasBase = esPSM
     ? ['Apoderado(a)','Profesor(a) Tutor(a)','Educador(a) Diferencial','Psicóloga','Terapeuta Ocupacional','Director(a) de Ciclo']
@@ -1878,7 +1892,7 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
     .bx{ display:inline-block; width:11px; height:11px; border:1px solid #555; border-radius:2px; flex-shrink:0; margin-top:1px; text-align:center; line-height:10px; font-size:9px; }
     .bx.on{ background:#2E8A95; color:#fff; border-color:#2E8A95; }
     .eq{ display:flex; flex-wrap:wrap; gap:7px; } .eq span{ border:1px solid #b9c2d0; border-radius:4px; padding:4px 12px; font-weight:600; }
-    .obs{ border:1px solid #b9c2d0; min-height:46px; padding:7px 9px; } .inl .bx{ vertical-align:middle; } .p{ margin:4px 0; } .ul{ margin:4px 0 4px 16px; } .ul li{ margin-bottom:3px; }
+    .obs{ border:1px solid #b9c2d0; min-height:46px; padding:7px 9px; page-break-inside:avoid; break-inside:avoid; overflow:visible; } .inl .bx{ vertical-align:middle; } .p{ margin:4px 0; } .ul{ margin:4px 0 4px 16px; } .ul li{ margin-bottom:3px; }
     .firmas{ margin-top:34px; display:flex; flex-wrap:wrap; gap:26px 40px; justify-content:space-between; }
     .firmas div{ width:28%; text-align:center; border-top:1px solid #555; padding-top:5px; font-size:9.5px; }
     .firmas .sig{ border-top:1px solid #1E7A53; position:relative; }
