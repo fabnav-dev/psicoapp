@@ -998,13 +998,14 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const [firmandoIdx,setFirmandoIdx]=useState(null);
   const [mostrarResp,setMostrarResp]=useState(false);
   const [respTxt,setRespTxt]=useState('Los cambios que solicita requieren una entrevista presencial con el equipo psicoeducativo. Por favor contáctese al correo psicoeducativo@cmpe.cl, indicando en el asunto el curso y nombre del estudiante.');
-  const [planId,setPlanId]=useState(est.plan==='—'?'PAI':(est.plan==='Plan Salud Mental'?'PSM':est.plan));
-  const [phase,setPhase]=useState(est.estado==='pendiente'?'inicio':'listo'); // inicio | generando | listo
-  const [modo,setModo]=useState(est.estado==='pendiente'?null:'ia'); // ia | manual
-  const [marcadas,setMarcadas]=useState(()=> est.estado==='pendiente'?{}:seedMarcas());
+  const revExist=(revisiones||[]).find(r=>r.estId===est.id && ['en_revision','cambios','firmado','archivado'].includes(r.estado)) || (revisiones||[]).find(r=>r.estId===est.id);
+  const [planId,setPlanId]=useState(revExist?revExist.planId:(est.plan==='—'?'PAI':(est.plan==='Plan Salud Mental'?'PSM':est.plan)));
+  const [phase,setPhase]=useState(revExist?'listo':(est.estado==='pendiente'?'inicio':'listo')); // inicio | generando | listo
+  const [modo,setModo]=useState(revExist?(revExist.modo||'ia'):(est.estado==='pendiente'?null:'ia')); // ia | manual
+  const [marcadas,setMarcadas]=useState(()=> revExist&&revExist.marcadas?revExist.marcadas:(est.estado==='pendiente'?{}:seedMarcas()));
   const [resp,setResp]=useState(()=>{ const ex=(revisiones||[]).find(r=>r.estId===est.id && r.resp && Object.keys(r.resp).length); return (ex&&ex.resp)||{}; });
   const [director,setDirector]=useState('');
-  const [obs,setObs]=useState('');
+  const [obs,setObs]=useState(()=>{ const ex=(revisiones||[]).find(r=>r.estId===est.id && r.obs); return (ex&&ex.obs)||''; });
   const EQUIPO_ROLES=['Profesor/a Tutor/a','Psicólogo/a','Educador/a Diferencial','Terapeuta Ocupacional','Psicólogo/a de Convivencia'];
   const [equipo,setEquipo]=useState(()=>({'Profesor/a Tutor/a':true,'Educador/a Diferencial':true}));
   const toggleEquipo=(r)=> setEquipo(p=>({...p,[r]:!p[r]}));
@@ -2092,6 +2093,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
   const HIJOS = hijos;
   const rosterApo=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
   const normRut=(s)=>String(s||'').replace(/[.\s]/g,'').toLowerCase();
+  const maskRut=(r)=>{ const s=String(r||''); if(s.length<4) return '•••'; return '••.•••.'+s.replace(/[.\s]/g,'').slice(-4,-1)+'-'+s.replace(/[.\s]/g,'').slice(-1); };
   const [rutBusca,setRutBusca]=useState('');
   const [vinculando,setVinculando]=useState(false);
   const [pin,setPin]=useState('');
@@ -2163,7 +2165,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
             {buscaHijo(rutBusca).map(e=>(
               <button key={e.id} onClick={()=>vincular(e)} style={{ textAlign:'left', cursor:'pointer', background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'11px 13px', display:'flex', alignItems:'center', gap:11 }}>
                 <div style={{ width:38, height:38, borderRadius:11, background:t.card, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0, fontSize:12 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-                <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}{e.rut?' · '+e.rut:''}</div></div>
+                <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}{e.rut?' · '+maskRut(e.rut):''}</div></div>
                 <span style={{ flexShrink:0, color:t.primary, fontSize:12, fontWeight:800 }}>Vincular</span>
               </button>
             ))}
@@ -2201,7 +2203,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
           <div style={{ display:'flex', flexDirection:'column', gap:7, marginTop:9, maxHeight:220, overflowY:'auto' }}>
             {buscaHijo(rutBusca).filter(e=>!hijos.some(h=>h.id===e.id)).map(e=>(
               <button key={e.id} onClick={()=>vincular(e)} style={{ textAlign:'left', cursor:'pointer', background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:11 }}>
-                <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}{e.rut?' · '+e.rut:''}</div></div>
+                <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted }}>{e.curso}{e.rut?' · '+maskRut(e.rut):''}</div></div>
                 <span style={{ flexShrink:0, color:t.primary, fontSize:12, fontWeight:800 }}>Vincular</span>
               </button>
             ))}
