@@ -2084,10 +2084,11 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
   const [phase,setPhase]=useState('idle'); // idle | uploading | done
   const [hist,setHist]=useState(()=> (typeof window!=='undefined'&&window.PSICO_PILOTO) ? [] : [{ doc:'Informe Fonoaudiología.pdf', fecha:'12 mar 2026', estado:'Procesado' }]);
   const [revisando,setRevisando]=useState(null); // documento en pantalla de revisión
-  // Hijos vinculados: PRIVADOS por cuenta de apoderado (no se comparten en la nube del colegio)
+  // Hijos vinculados: guardados en la CUENTA del apoderado (metadata) → disponibles en
+  // cualquier dispositivo/navegador, y privados (no se comparten con otros apoderados).
   const apoKey = 'psico_apo_hijos_'+((window.PSICO_USER&&window.PSICO_USER.id)||'anon');
-  const [hijos,setHijos]=useState(()=>{ const v=lsGet(apoKey,null); return v!=null ? v : lsGet('psico_apo_hijos_v1_migold',[]); });
-  useEffect(()=>{ lsSet(apoKey, hijos); },[hijos]);
+  const [hijos,setHijos]=useState(()=>{ const meta=(window.PSICO_USER&&window.PSICO_USER.hijos); if(Array.isArray(meta)&&meta.length) return meta; const v=lsGet(apoKey,null); return v!=null?v:[]; });
+  useEffect(()=>{ lsSet(apoKey, hijos); if(window.PSICO_USER) window.PSICO_USER.hijos=hijos; const sb=window.PSICO_SB; if(sb){ try{ sb.auth.updateUser({ data:{ hijos } }); }catch(e){} } },[hijos]);
   const HIJOS = hijos;
   const rosterApo=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
   const normRut=(s)=>String(s||'').replace(/[.\s]/g,'').toLowerCase();
