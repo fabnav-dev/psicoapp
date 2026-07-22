@@ -87,6 +87,19 @@ if(CLOUD_ON){
   const _set = localStorage.setItem.bind(localStorage);
   localStorage.setItem = (k, v)=>{ _set(k, v); if(String(k).indexOf('psico_')===0) window.dispatchEvent(new Event('psico-cloud-dirty')); };
 }
+// Reinicio total (modo piloto): visita  …/?reset=borrar  estando con sesión.
+// Borra TODOS los datos locales psico_ y vacía la fila del colegio en la nube.
+async function psicoResetTotal(){
+  try{
+    Object.keys(localStorage).forEach(k=>{ if(String(k).indexOf('psico_')===0) localStorage.removeItem(k); });
+    if(CLOUD_ON && sb){ try{ await sb.from('psico_estado').update({ data:{}, updated_at:new Date().toISOString() }).eq('workspace', WORKSPACE); }catch(e){} }
+  }catch(e){}
+  location.replace(location.origin+location.pathname);
+}
+if(/[?&]reset=borrar/.test(location.search)){
+  if(CLOUD_ON && window.supabase){ const _sb=window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.anon); _sb.auth.getSession().then(({data})=>{ if(data.session){ psicoResetTotal(); } else { alert('Inicia sesión (Equipo) y vuelve a abrir …/?reset=borrar'); location.replace(location.origin+location.pathname); } }); }
+  else { psicoResetTotal(); }
+}
 
 // ─── 3 DIRECCIONES VISUALES ──────────────────────────────────────
 const THEMES = {
