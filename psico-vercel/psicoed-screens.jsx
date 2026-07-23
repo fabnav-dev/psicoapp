@@ -2054,7 +2054,31 @@ function ProfesorDashboard({ t }){
             </button>
             {open===e.id && (
               <div style={{ padding:'4px 15px 15px', borderTop:`1px solid ${t.border}` }} className="fade">
-                <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, margin:'12px 0 8px' }}>Apoyos en el aula</div>
+                {(()=>{
+                  const docs=(revisionesProf||[]).filter(r=>r.estId===e.id && (r.estado==='firmado'||r.estado==='archivado'));
+                  const docNoms=[...new Set(docs.map(r=>r.planNombre||r.planId))];
+                  const aps=apoyosAsig[e.id]||[];
+                  const plan=pta.data[e.id]||{}; let nEv=0; asignaturasFor(e.curso).forEach(a=>{ nEv+=(plan[a]||[]).length; });
+                  const chip=(txt,bg,col)=>(<span style={{ background:bg, color:col, fontSize:10.5, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>{txt}</span>);
+                  return (
+                    <div style={{ background:t.soft, border:`1px solid ${t.border}`, borderRadius:12, padding:'12px 14px', margin:'12px 0 4px' }}>
+                      <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, marginBottom:9 }}>Ficha del estudiante</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+                        <div>
+                          <div style={{ fontSize:10.5, color:t.muted, fontWeight:700, marginBottom:4 }}>Documentos vigentes</div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                            {docNoms.length ? docNoms.map((d,i)=><span key={i} style={{ background:'#EAF3F0', color:'#1E7A53', fontSize:10.5, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>{d}</span>) : <span style={{ fontSize:11, color:t.muted, fontStyle:'italic' }}>Sin planes vigentes aún</span>}
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', gap:22, flexWrap:'wrap' }}>
+                          <div><div style={{ fontSize:10.5, color:t.muted, fontWeight:700 }}>Apoyos por asignatura</div><div style={{ fontSize:15, fontWeight:800, color:t.ink }}>{aps.length} {chip(aps.length?[...new Set(aps.map(a=>a.asignatura))].slice(0,3).join(' · '):'—', 'transparent', t.muted)}</div></div>
+                          <div><div style={{ fontSize:10.5, color:t.muted, fontWeight:700 }}>Evaluaciones programadas</div><div style={{ fontSize:15, fontWeight:800, color:t.ink }}>{nEv}</div></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, margin:'14px 0 8px' }}>Apoyos en el aula</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
                   {(SINTESIS[e.id]||[]).map((s,i)=>(
                     <div key={i} style={{ display:'flex', gap:9, alignItems:'flex-start' }}>
