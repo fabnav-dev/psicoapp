@@ -54,7 +54,7 @@ const sb = CLOUD_ON ? window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.an
 window.PSICO_SB = sb; // expuesto para subir/leer informes desde Storage (bucket "informes")
 const WORKSPACE = PSICO_SUPA.workspace || 'colegio';
 // Todas las claves de datos que ya guarda la capa 1 en localStorage
-const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1','psico_seg_v1','psico_salud_v1','psico_desreg_v1','psico_adh_v1','psico_audit_v1','psico_caso_v1','psico_datos_v1','psico_lectura_v1'];
+const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1','psico_seg_v1','psico_salud_v1','psico_desreg_v1','psico_adh_v1','psico_audit_v1','psico_caso_v1','psico_datos_v1','psico_lectura_v1','psico_apoyos_v1'];
 // NOTA: 'psico_apo_hijos_v1' NO se sincroniza al bloque del colegio — los hijos
 // vinculados son PRIVADOS por cuenta de apoderado (se guardan por usuario).
 const ROLES = [

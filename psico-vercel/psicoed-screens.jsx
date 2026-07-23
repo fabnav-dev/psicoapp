@@ -1971,11 +1971,10 @@ function ProfesorDashboard({ t }){
   useEffect(()=>{ const h=()=>setLeidos(lsGet('psico_lectura_v1',{})); window.addEventListener('lect-change',h); window.addEventListener('storage',h); return ()=>{ window.removeEventListener('lect-change',h); window.removeEventListener('storage',h); }; },[]);
   const [confAsig,setConfAsig]=useState({});     // input de asignatura por estudiante
   const [equipoUpd,setEquipoUpd]=useState({});   // {estId:true} = el equipo actualizó los apoyos
-  const confirmarLectura=(estId)=>{ const a=(confAsig[estId]||'').trim(); if(!a)return; const fecha=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}); const map={...lsGet('psico_lectura_v1',{}), [estId+'::'+a]:fecha}; lsSet('psico_lectura_v1',map); setLeidos(map); window.dispatchEvent(new Event('lect-change')); setConfAsig(p=>({...p,[estId]:''}));
-    // Alimenta la adherencia docente que ve Gestión (psico_adh_v1): por curso [confirmadas, total NEE]
-    try{ const est=rosterProf.find(e=>e.id===estId); if(est){ const cur=normCurso(est.curso); const adh=lsGet('psico_adh_v1',{}); const tot=(neeCountProf[cur]||1); const prev=Array.isArray(adh[cur])?adh[cur][0]:0; adh[cur]=[Math.min(tot,prev+1),tot]; lsSet('psico_adh_v1',adh); } }catch(e){} };
-  // apoyos por asignatura reportados por cada profesor: { [estId]: [{asignatura, profesor, correo, apoyos}] }
-  const [apoyosAsig,setApoyosAsig]=useState({});
+  const confirmarLectura=(estId)=>{ const a=(confAsig[estId]||'').trim(); if(!a)return; const fecha=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}); const map={...lsGet('psico_lectura_v1',{}), [estId+'::'+a]:fecha}; lsSet('psico_lectura_v1',map); setLeidos(map); window.dispatchEvent(new Event('lect-change')); setConfAsig(p=>({...p,[estId]:''})); };
+  // apoyos por asignatura reportados por cada profesor: { [estId]: [{asignatura, profesor, correo, apoyos}] } — compartido con Gestión
+  const [apoyosAsig,setApoyosAsig]=useState(()=>lsGet('psico_apoyos_v1',{}));
+  useEffect(()=>{ lsSet('psico_apoyos_v1', apoyosAsig); },[apoyosAsig]);
   const [form,setForm]=useState({ asignatura:'', profesor:'', correo:'', apoyos:'' });
   const pta=usePTA();
   const [evForm,setEvForm]=useState({ asignatura:ASIGNATURAS_7[0], tipo:'Prueba', desc:'', fecha:'', profesor:'' });
@@ -2621,6 +2620,26 @@ const GESTION_DOCS = [
   { id:'PSM', nombre:'Plan Salud Mental', full:'Plan Curricular Salud Mental', firmados:2, total:5, color:'#7A4FB0' },
 ];
 // DOCS reales por tipo de plan, desde las revisiones (firmados/total)
+// Adherencia docente REAL (Opción B): denominador = asignaturas con apoyo reportado
+// para estudiantes en seguimiento; numerador = de esas, cuántas confirmó el profesor.
+// Devuelve { curso: [confirmadas, totalConApoyo] } — solo cursos que tienen apoyos.
+function gestionAdherenciaReal(){
+  const apoyos=lsGet('psico_apoyos_v1',{});
+  const lect=lsGet('psico_lectura_v1',{});
+  const seg=lsGet('psico_seg_v1',{});
+  const inf=infLoad(); const revis=lsGet('psico_revisiones_v1',[]);
+  const roster=[...ESTUDIANTES,...lsGet('psico_extra_v1',[])];
+  const norm=(s)=>String(s||'').trim().toLowerCase();
+  const out={};
+  roster.forEach(e=>{
+    if(!enSeguimiento(e,inf,revis,seg)) return;
+    const asigs=[...new Set((apoyos[e.id]||[]).map(a=>a.asignatura).filter(Boolean))];
+    if(!asigs.length) return;
+    const cur=normCurso(e.curso); out[cur]=out[cur]||[0,0];
+    asigs.forEach(asig=>{ out[cur][1]++; const conf=Object.keys(lect).some(k=> k.startsWith(e.id+'::') && norm(k.split('::')[1])===norm(asig) && lect[k]); if(conf) out[cur][0]++; });
+  });
+  return out;
+}
 function gestionDocsReales(){
   const revis=lsGet('psico_revisiones_v1',[]);
   const META={ PAI:{ nombre:'P.A.I.', full:'Plan de Acompañamiento Individual', color:'#2C7A6B' }, PACI:{ nombre:'P.A.C.I.', full:'Plan de Adecuación Curricular Individual', color:'#185FA5' }, PAEC:{ nombre:'P.A.E.C.', full:'Plan de Adecuación Evaluativa', color:'#C2841E' }, PSM:{ nombre:'Plan Salud Mental', full:'Plan Curricular Salud Mental', color:'#7A4FB0' } };
@@ -2667,7 +2686,7 @@ function GestionDashboard({ t, revisiones }){
   const TENDENCIA = gestionTendenciaReal();
   const DOCS = gestionDocsReales();
   // adherencia docente: se alimenta de las confirmaciones 'leído y aplicado' de los profesores
-  const ADHERENCIA = lsGet('psico_adh_v1', {});
+  const ADHERENCIA = gestionAdherenciaReal();
   const adhTot = Object.values(ADHERENCIA).reduce((a,v)=>a+(Array.isArray(v)?v[0]:0),0);
   const adhMax = Object.values(ADHERENCIA).reduce((a,v)=>a+(Array.isArray(v)?v[1]:0),0);
   const adhPct = adhMax? Math.round(adhTot/adhMax*100):0;
@@ -3029,7 +3048,7 @@ function imprimirGestion(colegio){
   const GC_EXP=gestionRowsReales();
   const DOCS_EXP=gestionDocsReales();
   const TEND_EXP=gestionTendenciaReal();
-  const ADH_EXP=lsGet('psico_adh_v1', {});
+  const ADH_EXP=gestionAdherenciaReal();
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const tn=(pct)=>pct>=80?'#1E7A53':pct>=50?'#2563B8':'#B23A24';
   const ciclosHTML=CICLOS_GESTION.map(c=>{ const ag=aggrega(GC_EXP.filter(r=>r.ciclo===c.id));
