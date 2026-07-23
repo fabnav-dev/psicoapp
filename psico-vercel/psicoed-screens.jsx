@@ -2004,7 +2004,7 @@ function ProfesorDashboard({ t }){
               {rosterProf.filter(e=> enSeguimiento(e,inf.data,revisionesProf,seg) && (e.nombre+' '+(e.diag||'')).toLowerCase().includes(busca.toLowerCase())).map(e=>(
                 <button key={e.id} onClick={()=>{ setCurso(normCurso(e.curso)); setOpen(e.id); setBusca(''); }} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ width:38, height:38, borderRadius:11, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-                  <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:1 }}>{e.curso}{e.diag&&e.diag!=='—'?' · '+e.diag:''}</div></div>
+                  <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:1 }}>{(()=>{ const d=lsGet('psico_datos_v1',{})[e.id]||{}; const diag=d.diag||e.diag||''; return e.curso+(diag&&diag!=='—'?' · '+diag:''); })()}</div></div>
                 </button>
               ))}
               {rosterProf.filter(e=> enSeguimiento(e,inf.data,revisionesProf,seg) && (e.nombre+' '+(e.diag||'')).toLowerCase().includes(busca.toLowerCase())).length===0 && <div style={{ textAlign:'center', color:t.muted, fontSize:12, padding:20 }}>Sin resultados.</div>}
@@ -2048,7 +2048,7 @@ function ProfesorDashboard({ t }){
           <div key={e.id} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, overflow:'hidden' }}>
             <button onClick={()=>setOpen(open===e.id?null:e.id)} style={{ width:'100%', textAlign:'left', cursor:'pointer', background:'none', border:'none', padding:'13px 15px', display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ width:40, height:40, borderRadius:11, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{e.diag}</div></div>
+              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{(()=>{ const d=lsGet('psico_datos_v1',{})[e.id]||{}; const diag=d.diag||e.diag||''; return [e.rut, diag].filter(Boolean).join(' · ')||'—'; })()}</div></div>
               <Chip t={t} label={e.plan} tone="soft" />
               <span style={{ color:t.muted, fontSize:15, transform:open===e.id?'rotate(180deg)':'none', transition:'.2s', marginLeft:4 }}>⌄</span>
             </button>
