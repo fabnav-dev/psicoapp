@@ -708,7 +708,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   if(curso) return <CursoEstudiantes t={t} curso={curso} extra={extra} revisiones={revisiones} onBack={()=>setCurso(null)} onSel={setSel} />;
 
   const estaGestionado = (n)=> (revisiones||[]).some(r=>r.estId===n.estId && (r.estado==='firmado'||r.estado==='archivado'));
-  const nuevos = notifs.filter(n=>n.estado==='nuevo');
+  const nuevos = notifs.filter(n=>n.estado==='nuevo' && !estaGestionado(n));
   const bandeja = notifs.filter(n=>!estaGestionado(n)); // pendientes: nuevo + en proceso
   const gestionados = notifs.filter(estaGestionado);
   const neeCount={}; roster.forEach(e=>{ if(enSeguimiento(e,inf.data,revisiones,seg)){ const c=normCurso(e.curso); neeCount[c]=(neeCount[c]||0)+1; } });
