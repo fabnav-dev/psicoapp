@@ -280,7 +280,7 @@ function App(){
       {screen==='login' && <window.Login t={t} role={role} onLogin={login} onBack={()=>go('onboarding')} />}
       {screen==='app' && (
         <div style={{ height:'100%', display:'flex', flexDirection:'column' }}>
-          <window.AppHeader t={t} role={role} onLogout={logout} notifCount={notifs.filter(n=>n.estado==='nuevo').length} notifs={notifs} revisiones={revisiones} />
+          <window.AppHeader t={t} role={role} onLogout={logout} notifCount={notifs.filter(n=>n.estado==='nuevo' && !revisiones.some(r=>r.estId===n.estId && (r.estado==='firmado'||r.estado==='archivado'))).length} notifs={notifs} revisiones={revisiones} />
           <div style={{ flex:1, overflowY:'auto' }}>
             {role==='equipo' && <window.EquipoDashboard t={t} notifs={notifs} setNotifs={setNotifs} revisiones={revisiones} enviarRevision={enviarRevision} responderApoderado={responderApoderado} firmarInterno={firmarInterno} />}
             {role==='profesor' && <window.ProfesorDashboard t={t} />}

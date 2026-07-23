@@ -443,7 +443,8 @@ function AppHeader({ t, role, onLogout, onSwitch, notifCount, notifs, revisiones
   const [openN,setOpenN]=useState(false);
   const pend=[];
   if(role==='equipo'){
-    (notifs||[]).filter(n=>n.estado==='nuevo').forEach(n=>pend.push({ ic:'doc', txt:'Informe por procesar', sub:`${n.from} · ${n.curso}` }));
+    const _gest=(n)=> (revisiones||[]).some(r=>r.estId===n.estId && (r.estado==='firmado'||r.estado==='archivado'));
+    (notifs||[]).filter(n=>n.estado==='nuevo' && !_gest(n)).forEach(n=>pend.push({ ic:'doc', txt:'Informe por procesar', sub:`${n.from} · ${n.curso}` }));
     (revisiones||[]).filter(r=>r.estado==='cambios').forEach(r=>pend.push({ ic:'bell', txt:'Cambios solicitados', sub:`${r.estNombre} · ${r.planNombre}` }));
     (revisiones||[]).filter(r=>r.estado==='firmado').forEach(r=>pend.push({ ic:'check', txt:'Listo para archivar', sub:`${r.estNombre} · ${r.planNombre}` }));
   } else if(role==='apoderado'){
