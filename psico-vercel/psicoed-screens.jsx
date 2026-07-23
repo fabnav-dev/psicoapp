@@ -2049,7 +2049,7 @@ function ProfesorDashboard({ t }){
             <button onClick={()=>setOpen(open===e.id?null:e.id)} style={{ width:'100%', textAlign:'left', cursor:'pointer', background:'none', border:'none', padding:'13px 15px', display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ width:40, height:40, borderRadius:11, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
               <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{(()=>{ const d=lsGet('psico_datos_v1',{})[e.id]||{}; const diag=d.diag||e.diag||''; return [e.rut, diag].filter(Boolean).join(' · ')||'—'; })()}</div></div>
-              <Chip t={t} label={e.plan} tone="soft" />
+              {(()=>{ const docs=(revisionesProf||[]).filter(r=>r.estId===e.id && (r.estado==='firmado'||r.estado==='archivado')); const nom=[...new Set(docs.map(r=>r.planNombre||r.planId))][0]; return nom ? <Chip t={t} label={nom} tone="soft" /> : null; })()}
               <span style={{ color:t.muted, fontSize:15, transform:open===e.id?'rotate(180deg)':'none', transition:'.2s', marginLeft:4 }}>⌄</span>
             </button>
             {open===e.id && (
