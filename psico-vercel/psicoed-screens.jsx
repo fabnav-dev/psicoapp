@@ -1154,6 +1154,19 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
           <button onClick={()=>{ try{ navigator.clipboard.writeText(codigoVinculacion(est)); onToast('Código copiado: '+codigoVinculacion(est)); }catch(e){ onToast('Código: '+codigoVinculacion(est)); } }} title="Copiar" style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:8, padding:'6px 8px', cursor:'pointer' }}><Icon k="doc" c={t.primary} s={15} /></button>
         </div>
       </div>
+      {(()=>{ const lect=lsGet('psico_lectura_v1',{}); const conf=Object.keys(lect).filter(k=>k.startsWith(est.id+'::')&&lect[k]).map(k=>({ asig:k.split('::')[1], fecha:lect[k] })); if(!conf.length) return null; return (
+        <div style={{ background:'#EAF3F0', border:'1px solid #C9E3DB', borderRadius:t.radius, padding:'11px 14px', marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.4, marginBottom:7 }}>Lectura docente confirmada</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+            {conf.map((c,i)=>(
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ width:17, height:17, borderRadius:5, background:'#D5EBE1', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon k="check" c="#1E7A53" s={12} /></span>
+                <span style={{ fontSize:11.5, color:t.ink }}><b>{c.asig}</b> · leído y aplicado · {c.fecha}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ); })()}
       <div style={{ background:seguido?t.soft:t.card, border:`1px solid ${seguido?t.primary:t.border}`, borderRadius:t.radius, padding:'11px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
         <div style={{ flex:1, minWidth:180 }}>
           <div style={{ fontSize:12, fontWeight:800, color:seguido?t.primaryDark:t.ink }}>{seguido?'En seguimiento NEE':'En el directorio (sin seguimiento NEE)'}</div>
@@ -1953,13 +1966,13 @@ function ProfesorDashboard({ t }){
   const neeCountProf={}; rosterProf.forEach(e=>{ if(enSeguimiento(e,inf.data,revisionesProf,seg)){ const c=normCurso(e.curso); neeCountProf[c]=(neeCountProf[c]||0)+1; } });
   const [open,setOpen]=useState(null);
   const [busca,setBusca]=useState('');
-  const [leidos,setLeidos]=useState({});        // {`estId::Asignatura`: fechaConfirmación}
+  const [leidos,setLeidos]=useState(()=>lsGet('psico_lectura_v1',{}));        // {`estId::Asignatura`: fechaConfirmación} — compartido con Equipo/Gestión
+  useEffect(()=>{ const h=()=>setLeidos(lsGet('psico_lectura_v1',{})); window.addEventListener('lect-change',h); window.addEventListener('storage',h); return ()=>{ window.removeEventListener('lect-change',h); window.removeEventListener('storage',h); }; },[]);
   const [confAsig,setConfAsig]=useState({});     // input de asignatura por estudiante
   const [equipoUpd,setEquipoUpd]=useState({});   // {estId:true} = el equipo actualizó los apoyos
-  const confirmarLectura=(estId)=>{ const a=(confAsig[estId]||'').trim(); if(!a)return; setLeidos(p=>({...p,[estId+'::'+a]:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'})})); setConfAsig(p=>({...p,[estId]:''}));
+  const confirmarLectura=(estId)=>{ const a=(confAsig[estId]||'').trim(); if(!a)return; const fecha=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}); const map={...lsGet('psico_lectura_v1',{}), [estId+'::'+a]:fecha}; lsSet('psico_lectura_v1',map); setLeidos(map); window.dispatchEvent(new Event('lect-change')); setConfAsig(p=>({...p,[estId]:''}));
     // Alimenta la adherencia docente que ve Gestión (psico_adh_v1): por curso [confirmadas, total NEE]
     try{ const est=rosterProf.find(e=>e.id===estId); if(est){ const cur=normCurso(est.curso); const adh=lsGet('psico_adh_v1',{}); const tot=(neeCountProf[cur]||1); const prev=Array.isArray(adh[cur])?adh[cur][0]:0; adh[cur]=[Math.min(tot,prev+1),tot]; lsSet('psico_adh_v1',adh); } }catch(e){} };
-  const simularActualizacion=(estId)=>{ setEquipoUpd(p=>({...p,[estId]:true})); setLeidos(p=>{ const n={...p}; Object.keys(n).forEach(k=>{ if(k.startsWith(estId+'::')) n[k]=null; }); return n; }); };
   // apoyos por asignatura reportados por cada profesor: { [estId]: [{asignatura, profesor, correo, apoyos}] }
   const [apoyosAsig,setApoyosAsig]=useState({});
   const [form,setForm]=useState({ asignatura:'', profesor:'', correo:'', apoyos:'' });
@@ -2064,7 +2077,6 @@ function ProfesorDashboard({ t }){
                   <input value={confAsig[e.id]||''} onChange={ev=>setConfAsig(p=>({...p,[e.id]:ev.target.value}))} placeholder="Tu asignatura (ej: Matemáticas)" style={{ flex:1, padding:'8px 11px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, outline:'none' }} />
                   <button onClick={()=>confirmarLectura(e.id)} style={{ background:'#1E7A53', color:'#fff', border:'none', borderRadius:8, padding:'8px 13px', fontSize:11, fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }}>✓ Confirmar</button>
                 </div>
-                <button onClick={()=>simularActualizacion(e.id)} style={{ marginTop:6, background:'none', border:'none', color:t.muted, fontSize:9.5, cursor:'pointer', textDecoration:'underline' }}>(demo) simular actualización del equipo</button>
                 <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>Apoyos por asignatura</div>
                 {(apoyosAsig[e.id]||[]).map((a,i)=>(
                   <div key={i} style={{ background:t.soft, borderRadius:10, padding:'9px 12px', marginBottom:7 }}>
