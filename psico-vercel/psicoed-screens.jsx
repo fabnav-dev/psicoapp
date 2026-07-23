@@ -1966,6 +1966,7 @@ function ProfesorDashboard({ t }){
   const neeCountProf={}; rosterProf.forEach(e=>{ if(enSeguimiento(e,inf.data,revisionesProf,seg)){ const c=normCurso(e.curso); neeCountProf[c]=(neeCountProf[c]||0)+1; } });
   const [open,setOpen]=useState(null);
   const [busca,setBusca]=useState('');
+  const [filtroC,setFiltroC]=useState('');
   const [leidos,setLeidos]=useState(()=>lsGet('psico_lectura_v1',{}));        // {`estId::Asignatura`: fechaConfirmación} — compartido con Equipo/Gestión
   useEffect(()=>{ const h=()=>setLeidos(lsGet('psico_lectura_v1',{})); window.addEventListener('lect-change',h); window.addEventListener('storage',h); return ()=>{ window.removeEventListener('lect-change',h); window.removeEventListener('storage',h); }; },[]);
   const [confAsig,setConfAsig]=useState({});     // input de asignatura por estudiante
@@ -2041,10 +2042,13 @@ function ProfesorDashboard({ t }){
         Ves la <b style={{ color:t.ink }}>síntesis de apoyos y adecuaciones</b> de tus estudiantes. Por confidencialidad, los informes y planes completos solo los gestiona el equipo psicoeducativo.
       </div>
 
-      <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:10 }}>Estudiantes de {curso} con apoyo</div>
+      <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:10 }}>Estudiantes de {curso} con apoyo <span style={{ color:t.muted, fontWeight:600 }}>· {conApoyo.length}</span></div>
+      {conApoyo.length>4 && (
+        <input value={filtroC} onChange={e=>setFiltroC(e.target.value)} placeholder="Filtrar en este curso por nombre o RUT…" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:12.5, outline:'none', marginBottom:10, background:t.card, color:t.ink }} />
+      )}
       {conApoyo.length===0 && <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:24, textAlign:'center', color:t.muted, fontSize:12.5 }}>No hay estudiantes con plan activo en este curso.</div>}
       <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-        {conApoyo.map(e=>(
+        {(()=>{ const q=filtroC.trim().toLowerCase(); const lista=[...conApoyo].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).filter(e=> !q || (e.nombre+' '+(e.rut||'')).toLowerCase().includes(q)); if(conApoyo.length>0 && lista.length===0) return <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:20, textAlign:'center', color:t.muted, fontSize:12.5 }}>Sin resultados para “{filtroC}”.</div>; return lista.map(e=>(
           <div key={e.id} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, overflow:'hidden' }}>
             <button onClick={()=>setOpen(open===e.id?null:e.id)} style={{ width:'100%', textAlign:'left', cursor:'pointer', background:'none', border:'none', padding:'13px 15px', display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ width:40, height:40, borderRadius:11, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, flexShrink:0 }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
@@ -2175,7 +2179,7 @@ function ProfesorDashboard({ t }){
               </div>
             )}
           </div>
-        ))}
+        )); })()}
       </div>
         </React.Fragment>
       )}
