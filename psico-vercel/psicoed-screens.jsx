@@ -1982,7 +1982,10 @@ function ProfesorDashboard({ t }){
   const tutorNombre='María Paz Herrera';
   const addApoyo=(estId)=>{
     if(!form.asignatura.trim()||!form.apoyos.trim()) return;
-    setApoyosAsig(p=>({ ...p, [estId]: [...(p[estId]||[]), { ...form }] }));
+    setApoyosAsig(p=>({ ...p, [estId]: [...(p[estId]||[]), { ...form } ] }));
+    // Reportar apoyo confirma automáticamente la adherencia de esa asignatura
+    const fecha=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'});
+    const map={...lsGet('psico_lectura_v1',{}), [estId+'::'+form.asignatura.trim()]:fecha}; lsSet('psico_lectura_v1',map); setLeidos(map); window.dispatchEvent(new Event('lect-change'));
     setForm({ asignatura:'', profesor:'', correo:'', apoyos:'' });
   };
   const delApoyo=(estId,idx)=> setApoyosAsig(p=>({ ...p, [estId]: (p[estId]||[]).filter((_,i)=>i!==idx) }));
@@ -2105,17 +2108,33 @@ function ProfesorDashboard({ t }){
                 {equipoUpd[e.id] && (
                   <div style={{ background:'#FBE6E2', border:'1px solid #E8B4AA', borderRadius:9, padding:'9px 12px', marginTop:10, fontSize:11, fontWeight:600, color:'#B23A24' }}>El equipo actualizó los apoyos. Las confirmaciones por asignatura deben renovarse.</div>
                 )}
-                <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, margin:'14px 0 7px' }}>Confirmación de lectura por asignatura</div>
-                {Object.keys(leidos).filter(k=>k.startsWith(e.id+'::')&&leidos[k]).map(k=>(
-                  <div key={k} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
-                    <span style={{ width:18, height:18, borderRadius:6, background:'#E2F3EC', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon k="check" c="#1E7A53" s={12} /></span>
-                    <span style={{ fontSize:11.5, color:t.ink }}><b>{k.split('::')[1]}</b> · leído y aplicado · {leidos[k]}</span>
-                  </div>
-                ))}
-                <div style={{ display:'flex', gap:7, marginTop:6 }}>
-                  <input value={confAsig[e.id]||''} onChange={ev=>setConfAsig(p=>({...p,[e.id]:ev.target.value}))} placeholder="Tu asignatura (ej: Matemáticas)" style={{ flex:1, padding:'8px 11px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, outline:'none' }} />
-                  <button onClick={()=>confirmarLectura(e.id)} style={{ background:'#1E7A53', color:'#fff', border:'none', borderRadius:8, padding:'8px 13px', fontSize:11, fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }}>✓ Confirmar</button>
-                </div>
+                {(()=>{ const firmados=(revisionesProf||[]).filter(r=>r.estId===e.id && (r.estado==='firmado'||r.estado==='archivado'));
+                  if(!firmados.length) return (
+                    <div style={{ background:t.soft, border:`1px solid ${t.border}`, borderRadius:10, padding:'11px 13px', margin:'14px 0 4px', fontSize:11.5, color:t.muted, lineHeight:1.5 }}>Aún no hay un plan (PAI/PACI/PAEC) firmado por todas las partes para este estudiante. Cuando el plan esté firmado, aquí verás las adecuaciones que debes aplicar en tu asignatura.</div>
+                  );
+                  return (
+                    <div style={{ margin:'14px 0 4px' }}>
+                      <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, marginBottom:6 }}>Adecuaciones del plan vigente</div>
+                      <div style={{ fontSize:10, color:t.muted, marginBottom:9, lineHeight:1.5 }}>Definidas en el plan firmado por todas las partes. Aplícalas en tu asignatura y luego repórtalas abajo — al reportar, confirmas su aplicación.</div>
+                      {firmados.map((r,ri)=>{ const set=r.adecKey==='PAEC'?ADEC_EVAL:r.adecKey==='PSM'?ADEC_PSM:ADEC_ACCESO; const grupos=set.map((g,gi)=>({tipo:g.tipo,items:g.items.filter((it,ii)=>(r.marcadas||{})[gi+'-'+ii])})).filter(g=>g.items.length); return (
+                        <div key={ri} style={{ background:'#EAF3F0', border:'1px solid #C9E3DB', borderRadius:10, padding:'10px 13px', marginBottom:8 }}>
+                          <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', marginBottom:6 }}>{r.planNombre||r.planId}</div>
+                          {grupos.length? grupos.map((g,gj)=>(
+                            <div key={gj} style={{ marginBottom:7 }}>
+                              <div style={{ fontSize:10.5, fontWeight:700, color:t.ink, marginBottom:3 }}>{g.tipo}</div>
+                              {g.items.map((it,ii)=>(
+                                <div key={ii} style={{ display:'flex', gap:7, alignItems:'flex-start', marginBottom:2 }}>
+                                  <span style={{ color:'#1E7A53', fontSize:12, flexShrink:0, lineHeight:1.3 }}>•</span>
+                                  <span style={{ fontSize:11, color:t.ink, lineHeight:1.4 }}>{it}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )) : <div style={{ fontSize:10.5, color:t.muted }}>Sin adecuaciones marcadas en este plan.</div>}
+                        </div>
+                      );})}
+                    </div>
+                  );
+                })()}
                 <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>Apoyos por asignatura</div>
                 {(apoyosAsig[e.id]||[]).map((a,i)=>(
                   <div key={i} style={{ background:t.soft, borderRadius:10, padding:'9px 12px', marginBottom:7 }}>
