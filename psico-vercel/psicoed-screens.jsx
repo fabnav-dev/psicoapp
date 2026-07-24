@@ -731,7 +731,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
 
       {/* subpestañas */}
       <div style={{ display:'flex', gap:5, background:t.soft, padding:4, borderRadius:12, marginBottom:14 }}>
-        {[['cursos','Cursos'],['bandeja','Bandeja'],['alertas','Alertas'],['gestionados','Gestionados']].map(([id,label])=>(
+        {[['cursos','Cursos'],['bandeja','Bandeja'],['sala','Sala'],['alertas','Alertas'],['gestionados','Gestionados']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ flex:1, padding:'9px 6px', fontSize:12, fontWeight:700, borderRadius:9, border:'none', cursor:'pointer',
             background: tab===id?t.card:'transparent', color: tab===id?t.primary:t.muted, boxShadow: tab===id?'0 1px 4px rgba(0,0,0,0.08)':'none', transition:'all .15s', position:'relative' }}>
             {label}
@@ -740,6 +740,8 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
           </button>
         ))}
       </div>
+
+      {tab==='sala' && <window.SalaNeurobienestar t={t} roster={roster} />}
 
       {tab==='bandeja' && (
         <div className="fade">
@@ -2840,6 +2842,16 @@ function GestionDashboard({ t, revisiones }){
       {/* RESUMEN COLEGIO */}
       {tab==='resumen' && (
         <div className="fade" id="gestion-print">
+          {(()=>{ const s=(window.salaResumenGestion?window.salaResumenGestion():{total:0,prom:0,cicloTop:'—',estudiantes:0}); if(!s.total) return null; return (
+            <div style={{ background:'#EAF3F0', border:'1px solid #C9E3DB', borderRadius:t.radius, padding:'13px 16px', marginBottom:14 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.4, marginBottom:9, display:'flex', alignItems:'center', gap:7 }}><span>🌿</span>Sala de Neurobienestar</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+                {[['Visitas del período',s.total],['Tiempo promedio',s.prom+' min'],['Estudiantes',s.estudiantes],['Ciclo que más la usa',s.cicloTop]].map(([l,v])=>(
+                  <div key={l}><div style={{ fontFamily:t.display, fontSize:22, fontWeight:700, color:'#1E7A53' }}>{v}</div><div style={{ fontSize:10, color:t.muted, marginTop:1 }}>{l}</div></div>
+                ))}
+              </div>
+            </div>
+          ); })()}
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:20, marginBottom:14, display:'flex', alignItems:'center', gap:22, flexWrap:'wrap' }}>
             <Anillo pct={colegio.pct} size={104} />
             <div style={{ flex:1, minWidth:180 }}>
