@@ -2963,7 +2963,15 @@ function GestionDashboard({ t, revisiones }){
               </div>
             )); })()}
           </div>
-          <div className="fade">
+          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && (<React.Fragment>
+            <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.5, margin:'22px 0 10px', display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
+            <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />
+          </React.Fragment>)}
+        </div>
+      )}
+
+      {tab==='tendencia' && (
+        <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Tendencia del avance · mes a mes</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:14 }}>Evolución del % de documentos firmados a nivel colegio.</div>
           {TENDENCIA.length<2 ? (
@@ -2995,10 +3003,6 @@ function GestionDashboard({ t, revisiones }){
               </div>
             );})}
           </div>
-          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && (<React.Fragment>
-            <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.5, margin:'22px 0 10px', display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
-            <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />
-          </React.Fragment>)}
         </div>
       )}
       {tab==='ciclos' && (
