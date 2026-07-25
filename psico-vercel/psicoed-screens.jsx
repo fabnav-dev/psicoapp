@@ -2795,8 +2795,12 @@ function GestionDashboard({ t, revisiones }){
       {/* AHORRO DE TIEMPO · ROI */}
       {tab==='ahorro' && (()=>{
         const fmt=(n)=>'$'+Math.round(n).toLocaleString('es-CL');
-        const docsMes=(revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado').length;
-        const AH={ horasPorDoc:3.5, valorHora:14000, docsSemana:docsMes, docsMes:docsMes, docsAnio:docsMes };
+        const MES3A=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        const parseFecha=(s)=>{ const m=String(s||'').match(/(\d{1,2})\s*([a-z]{3})/i); if(!m) return null; const dia=parseInt(m[1],10); const mi=MES3A.indexOf(m[2].toLowerCase()); if(mi<0) return null; const yy=(String(s).match(/(20\d{2})/)||[])[1]; return new Date(yy?parseInt(yy,10):new Date().getFullYear(), mi, dia); };
+        const firmadas=(revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado');
+        const ahora=new Date(); const inicioSem=new Date(ahora); inicioSem.setDate(ahora.getDate()-6); inicioSem.setHours(0,0,0,0); const inicioMes=new Date(ahora.getFullYear(), ahora.getMonth(), 1); const inicioAnio=new Date(ahora.getFullYear(),0,1);
+        const cuenta=(desde)=> firmadas.filter(r=>{ const f=parseFecha(r.fechaFirma); return f? f>=desde : false; }).length;
+        const AH={ horasPorDoc:3.5, valorHora:14000, docsSemana:cuenta(inicioSem), docsMes:cuenta(inicioMes), docsAnio:(cuenta(inicioAnio)||firmadas.length) };
         const hSem=Math.round(AH.docsSemana*AH.horasPorDoc);
         const hMes=Math.round(AH.docsMes*AH.horasPorDoc);
         const hAnio=Math.round(AH.docsAnio*AH.horasPorDoc);
