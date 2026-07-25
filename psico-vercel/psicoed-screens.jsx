@@ -2963,13 +2963,7 @@ function GestionDashboard({ t, revisiones }){
               </div>
             )); })()}
           </div>
-          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && (<React.Fragment>
-            <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.5, margin:'22px 0 10px', display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
-            <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />
-          </React.Fragment>)}
-        </div>
-      )}
-        <div className="fade">
+          <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Tendencia del avance · mes a mes</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:14 }}>Evolución del % de documentos firmados a nivel colegio.</div>
           {TENDENCIA.length<2 ? (
@@ -3001,6 +2995,10 @@ function GestionDashboard({ t, revisiones }){
               </div>
             );})}
           </div>
+          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && (<React.Fragment>
+            <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.5, margin:'22px 0 10px', display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
+            <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />
+          </React.Fragment>)}
         </div>
       )}
       {tab==='ciclos' && (
@@ -3118,6 +3116,7 @@ function imprimirGestion(colegio){
   <table><thead><tr><th>Curso</th><th style="text-align:center">Asignaturas que confirmaron</th><th style="text-align:center">Adherencia</th></tr></thead><tbody>${Object.keys(ADH_EXP).length===0?`<tr><td colspan="3" style="text-align:center;color:#666">Aún sin datos de adherencia docente</td></tr>`:Object.entries(ADH_EXP).map(([cur,v])=>{ const c=Array.isArray(v)?v[0]:0, m=Array.isArray(v)?v[1]:0; const p=m?Math.round(c/m*100):0; return `<tr><td>${esc(cur)}</td><td style="text-align:center">${c} de ${m}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`; }).join('')}</tbody></table>
   <h2>Cumplimiento normativo</h2>
   <table><thead><tr><th>Indicador</th><th style="text-align:center">Cumplimiento</th></tr></thead><tbody>${(()=>{ const g=DOCS_EXP.filter(d=>d.id==='PAI'||d.id==='PACI'); const tot=g.reduce((a,d)=>a+d.total,0), fi=g.reduce((a,d)=>a+d.firmados,0); const d83=tot?Math.round(fi/tot*100):0; const pc=DOCS_EXP.find(d=>d.id==='PAEC'); const d67=pc&&pc.total?Math.round(pc.firmados/pc.total*100):0; const vig=colegio&&colegio.pct?colegio.pct:0; return [['Decreto 83/2015 · Diversificación de la enseñanza',d83],['Decreto 67/2018 · Evaluación y promoción',d67],['Planes con revisión vigente (al día)',vig]]; })().map(([l,p])=>`<tr><td>${esc(l)}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`).join('')}</tbody></table>
+  ${(()=>{ const s=(window.salaResumenGestion?window.salaResumenGestion():{total:0}); if(!s.total) return ''; const d=lsGet('psico_sala_v1',[]); const cnt=(k)=>{ const o={}; d.forEach(r=>{ let v=r[k]||'—'; if(k==='ciclo'&&v==='Ciclo Superior')v='Tercer Ciclo'; o[v]=(o[v]||0)+1; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); }; const tot=d.length||1; const fila=(rows)=>rows.map(([l,v])=>`<tr><td>${String(l).replace(/[&<>]/g,'')}</td><td style="text-align:center">${v}</td><td style="text-align:center">${Math.round(v/tot*100)}%</td></tr>`).join(''); return `<h2>Sala de Neurobienestar</h2><table><thead><tr><th>Uso por ciclo escolar</th><th style="text-align:center">Visitas</th><th style="text-align:center">%</th></tr></thead><tbody>${fila(cnt('ciclo'))}</tbody></table><table style="margin-top:8px"><thead><tr><th>Motivo de ingreso</th><th style="text-align:center">Visitas</th><th style="text-align:center">%</th></tr></thead><tbody>${fila(cnt('motivo'))}</tbody></table>`; })()}
   <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
   </body></html>`);
