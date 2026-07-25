@@ -2842,17 +2842,7 @@ function GestionDashboard({ t, revisiones }){
       {/* RESUMEN COLEGIO */}
       {tab==='resumen' && (
         <div className="fade" id="gestion-print">
-          {(()=>{ const s=(window.salaResumenGestion?window.salaResumenGestion():{total:0,prom:0,cicloTop:'—',estudiantes:0}); if(!s.total) return null; return (
-            <div style={{ background:'#EAF3F0', border:'1px solid #C9E3DB', borderRadius:t.radius, padding:'13px 16px', marginBottom:14 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.4, marginBottom:9, display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-                {[['Visitas del período',s.total],['Tiempo promedio',s.prom+' min'],['Estudiantes',s.estudiantes],['Ciclo que más la usa',s.cicloTop]].map(([l,v])=>(
-                  <div key={l}><div style={{ fontFamily:t.display, fontSize:22, fontWeight:700, color:'#1E7A53' }}>{v}</div><div style={{ fontSize:10, color:t.muted, marginTop:1 }}>{l}</div></div>
-                ))}
-              </div>
-            </div>
-          ); })()}
-          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />}
+          <div style={{ fontSize:11, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.5, marginBottom:10 }}>Necesidades Educativas Especiales</div>
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:20, marginBottom:14, display:'flex', alignItems:'center', gap:22, flexWrap:'wrap' }}>
             <Anillo pct={colegio.pct} size={104} />
             <div style={{ flex:1, minWidth:180 }}>
@@ -2973,10 +2963,12 @@ function GestionDashboard({ t, revisiones }){
               </div>
             )); })()}
           </div>
+          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && (<React.Fragment>
+            <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.5, margin:'22px 0 10px', display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
+            <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />
+          </React.Fragment>)}
         </div>
       )}
-
-      {tab==='tendencia' && (
         <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Tendencia del avance · mes a mes</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:14 }}>Evolución del % de documentos firmados a nivel colegio.</div>
