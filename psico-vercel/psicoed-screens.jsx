@@ -2838,7 +2838,7 @@ function GestionDashboard({ t, revisiones }){
               </div>
             ))}
           </div>
-          <div style={{ background:t.soft, borderRadius:t.radius, padding:'13px 16px', fontSize:11.5, color:t.primaryDark, lineHeight:1.5 }}><b>Retorno de la inversión.</b> El equipo recupera <b>{hMes} horas al mes</b> para lo que importa: acompañar a los estudiantes. Rumbo cuesta una fracción del valor de esas horas.</div>
+          <div style={{ background:t.soft, borderRadius:t.radius, padding:'13px 16px', fontSize:11.5, color:t.primaryDark, lineHeight:1.5 }}><b>Retorno de la inversión.</b> El equipo recupera <b>{hMes} horas al mes</b> para lo que importa: acompañar a los estudiantes.</div>
         </div>
         );
       })()}
