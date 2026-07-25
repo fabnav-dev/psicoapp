@@ -3060,12 +3060,37 @@ function GestionDashboard({ t, revisiones }){
 function exportarExcel(){
   auditPush('Gestión','exportó informe a Excel');
   const GC_EXP=gestionRowsReales();
-  const filas=[['Curso','Estudiantes NEE','Firmados','Por firmar','Avance %']];
-  GC_EXP.forEach(r=>{ const tot=r.firmados+r.porFirmar; filas.push([r.curso, r.nee, r.firmados, r.porFirmar, tot?Math.round(r.firmados/tot*100):0]); });
-  const csv='\uFEFF'+filas.map(f=>f.join(';')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const DOCS_EXP=gestionDocsReales();
+  const col=aggrega(GC_EXP);
+  const esc=(s)=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const logo=location.origin+location.pathname.replace(/[^/]*$/,'')+'logo-colegio.png';
+  const fecha=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  const tn=(p)=>p>=80?'#1E7A53':p>=50?'#B8860B':'#C2410C';
+  const th='background:#2C7A6B;color:#ffffff;font-weight:bold;padding:7px 10px;border:1px solid #23625550;text-align:left;';
+  const td='padding:6px 10px;border:1px solid #d8e5e1;';
+  const filasCurso=GC_EXP.map(r=>{ const tot=r.firmados+r.porFirmar; const p=tot?Math.round(r.firmados/tot*100):0; return `<tr><td style="${td}font-weight:bold">${esc(r.curso)}</td><td style="${td}text-align:center">${r.nee}</td><td style="${td}text-align:center">${r.firmados}</td><td style="${td}text-align:center">${r.porFirmar}</td><td style="${td}text-align:center;color:${tn(p)};font-weight:bold">${p}%</td></tr>`; }).join('');
+  const filasDoc=DOCS_EXP.map(d=>{ const p=d.total?Math.round(d.firmados/d.total*100):0; return `<tr><td style="${td}font-weight:bold">${esc(d.nombre)}</td><td style="${td}">${esc(d.full)}</td><td style="${td}text-align:center">${d.firmados}/${d.total}</td><td style="${td}text-align:center;color:${tn(p)};font-weight:bold">${p}%</td></tr>`; }).join('');
+  const salaBlock=(()=>{ const s=(window.salaResumenGestion?window.salaResumenGestion():{total:0}); if(!s.total) return ''; const d=lsGet('psico_sala_v1',[]); const tot=d.length||1; const cnt=(k)=>{ const o={}; d.forEach(r=>{ let v=r[k]||'—'; if(k==='ciclo'&&v==='Ciclo Superior')v='Tercer Ciclo'; o[v]=(o[v]||0)+1; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); }; const fila=(rows)=>rows.map(([l,v])=>`<tr><td style="${td}">${esc(l)}</td><td style="${td}text-align:center">${v}</td><td style="${td}text-align:center">${Math.round(v/tot*100)}%</td></tr>`).join(''); const nivel=(x)=>['Desregulado / Alerta Alta','Alerta Modulada / Basal','Regulado / Alerta Óptima'].indexOf(x); let mej=0,ig=0,baj=0; d.forEach(r=>{ const a=nivel(r.ei), b=nivel(r.ef); if(a<0||b<0) return; if(b>a)mej++; else if(b===a)ig++; else baj++; }); const efFila=[['Mejoró (salió más regulado)',mej],['Se mantuvo igual',ig],['Empeoró',baj]].map(([l,v])=>`<tr><td style="${td}">${esc(l)}</td><td style="${td}text-align:center">${v}</td><td style="${td}text-align:center">${Math.round(v/tot*100)}%</td></tr>`).join(''); return `<tr><td colspan="5" style="height:14px"></td></tr><tr><td colspan="5" style="background:#DCEAE6;color:#1E5A4E;font-weight:bold;padding:6px 10px;border:1px solid #cfe0db">SALA DE NEUROBIENESTAR</td></tr><tr><td colspan="5"><table style="width:100%;border-collapse:collapse"><tr><th style="${th}">Uso por ciclo</th><th style="${th}text-align:center">Visitas</th><th style="${th}text-align:center">%</th></tr>${fila(cnt('ciclo'))}<tr><th style="${th}">Motivo de ingreso</th><th style="${th}text-align:center">Visitas</th><th style="${th}text-align:center">%</th></tr>${fila(cnt('motivo'))}<tr><th style="${th}">Efectividad de la regulación</th><th style="${th}text-align:center">Visitas</th><th style="${th}text-align:center">%</th></tr>${efFila}</table></td></tr>`; })();
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>
+  <table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11px;color:#16302B">
+    <tr><td colspan="5" style="background:#1E5A4E;color:#ffffff;padding:14px 12px;font-size:16px;font-weight:bold"><img src="${logo}" height="34" style="vertical-align:middle;margin-right:10px">Informe de Gestión · NEE</td></tr>
+    <tr><td colspan="5" style="background:#2C7A6B;color:#ffffff;padding:5px 12px;font-size:10px">Colegio Mayor Peñalolén · ${fecha} · Avance global ${col.pct}%</td></tr>
+    <tr><td colspan="5" style="height:12px"></td></tr>
+    <tr><td colspan="5" style="background:#DCEAE6;color:#1E5A4E;font-weight:bold;padding:6px 10px;border:1px solid #cfe0db">RESUMEN POR CURSO</td></tr>
+    <tr><th style="${th}">Curso</th><th style="${th}text-align:center">Estudiantes NEE</th><th style="${th}text-align:center">Firmados</th><th style="${th}text-align:center">Por firmar</th><th style="${th}text-align:center">Avance %</th></tr>
+    ${filasCurso}
+    <tr><td style="${td}font-weight:bold;background:#EAF3F0">TOTAL</td><td style="${td}text-align:center;font-weight:bold;background:#EAF3F0">${col.nee}</td><td style="${td}text-align:center;font-weight:bold;background:#EAF3F0">${col.firmados}</td><td style="${td}text-align:center;font-weight:bold;background:#EAF3F0">${col.porFirmar}</td><td style="${td}text-align:center;font-weight:bold;background:#EAF3F0;color:${tn(col.pct)}">${col.pct}%</td></tr>
+    <tr><td colspan="5" style="height:14px"></td></tr>
+    <tr><td colspan="5" style="background:#DCEAE6;color:#1E5A4E;font-weight:bold;padding:6px 10px;border:1px solid #cfe0db">DOCUMENTOS POR TIPO</td></tr>
+    <tr><th style="${th}">Plan</th><th style="${th}">Nombre completo</th><th style="${th}text-align:center">Firmados / Total</th><th style="${th}text-align:center">Avance</th></tr>
+    ${filasDoc}
+    ${salaBlock}
+    <tr><td colspan="5" style="height:16px"></td></tr>
+    <tr><td colspan="5" style="color:#999;font-size:9px;padding-top:6px">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</td></tr>
+  </table></body></html>`;
+  const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='Gestion_NEE_'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+  a.download='Gestion_NEE_'+new Date().toISOString().slice(0,10)+'.xls'; a.click(); URL.revokeObjectURL(a.href);
 }
 
 // informe de gestión imprimible
