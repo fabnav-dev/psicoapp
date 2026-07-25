@@ -4,7 +4,7 @@ const { useState:useStateS, useEffect:useEffectS, useMemo:useMemoS } = React;
 const _lg=(k,fb)=>{ try{ const v=localStorage.getItem(k); return v!=null?JSON.parse(v):fb; }catch(e){ return fb; } };
 const _ls=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
 const _nc=(c)=>String(c||'').replace(/\s*B[áa]sico|\s*Medio/i,'').replace(/\s/g,'');
-const _ciclo=(code)=>{ const g=String(code||'').replace(/[A-E]$/,''); if(['PK','K','1°','2°'].includes(g)) return 'Primer Ciclo'; if(['3°','4°','5°','6°'].includes(g)) return 'Segundo Ciclo'; return 'Ciclo Superior'; };
+const _ciclo=(code)=>{ const g=String(code||'').replace(/[A-E]$/,''); if(['PK','K','1°','2°'].includes(g)) return 'Primer Ciclo'; if(['3°','4°','5°','6°'].includes(g)) return 'Segundo Ciclo'; return 'Tercer Ciclo'; };
 
 const SALA_MOTIVOS = ['Desregulación / Crisis en aula o patio','Sobrecarga sensorial','Ansiedad / Angustia','Prevención / Pausa regulada','Derivación del equipo','Conflicto interpersonal','Otro'];
 const SALA_ESTADOS = ['Desregulado / Alerta Alta','Alerta Modulada / Basal','Regulado / Alerta Óptima'];
@@ -59,9 +59,9 @@ function Panel({ t, titulo, children }){
   </div>);
 }
 
-function SalaNeurobienestar({ t, roster }){
+function SalaNeurobienestar({ t, roster, soloIndicadores }){
   const sala=useSala();
-  const [sub,setSub]=useStateS('registro'); // registro | bitacora | indicadores
+  const [sub,setSub]=useStateS(soloIndicadores?'indicadores':'registro'); // registro | bitacora | indicadores
   const hoy=new Date().toISOString().slice(0,10);
   const vacio={ fecha:hoy, estId:'', estNombre:'', curso:'', ciclo:'', hi:'', hf:'', motivo:SALA_MOTIVOS[0], motivoOtro:'', ei:SALA_ESTADOS[1], obs:'', ef:SALA_ESTADOS[2], mats:[], profesional:'' };
   const [f,setF]=useStateS(vacio);
@@ -106,16 +106,16 @@ function SalaNeurobienestar({ t, roster }){
 
   return (
     <div className="fade">
-      <div style={{ display:'flex', alignItems:'center', gap:11, marginBottom:6 }}>
+      {!soloIndicadores && <div style={{ display:'flex', alignItems:'center', gap:11, marginBottom:6 }}>
         <div style={{ width:40, height:40, borderRadius:12, background:t.primary+'1a', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><SalaLeaf c={t.primary} s={22} /></div>
         <div><div style={{ fontFamily:t.display, fontSize:18, fontWeight:700, color:t.ink }}>Sala de Neurobienestar</div>
           <div style={{ fontSize:11, color:t.muted }}>Registro de uso y acompañamiento · {ind.total} visita{ind.total!==1?'s':''}</div></div>
-      </div>
-      <div style={{ display:'flex', gap:5, background:t.soft, padding:4, borderRadius:12, margin:'12px 0 14px' }}>
+      </div>}
+      {!soloIndicadores && <div style={{ display:'flex', gap:5, background:t.soft, padding:4, borderRadius:12, margin:'12px 0 14px' }}>
         {[['registro','Registrar visita'],['bitacora','Bitácora'],['indicadores','Indicadores']].map(([id,l])=>(
           <button key={id} onClick={()=>setSub(id)} style={{ flex:1, padding:'9px 6px', fontSize:12, fontWeight:700, borderRadius:9, border:'none', cursor:'pointer', background:sub===id?t.card:'transparent', color:sub===id?t.primary:t.muted, boxShadow:sub===id?'0 1px 4px rgba(0,0,0,0.08)':'none' }}>{l}</button>
         ))}
-      </div>
+      </div>}
 
       {sub==='registro' && (
         <div className="fade" style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:16 }}>
@@ -179,7 +179,7 @@ function SalaNeurobienestar({ t, roster }){
               <option value="">Todos los cursos</option>{cursosCon.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
             <span style={{ fontSize:11.5, color:t.muted }}>{visibles.length} registro{visibles.length!==1?'s':''}</span>
-            <button onClick={()=>imprimirSala(sala.data)} style={{ marginLeft:'auto', background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Descargar bitácora (PDF)</button>
+            <button onClick={()=>imprimirSala(sala.data,'bitacora')} style={{ marginLeft:'auto', background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Descargar bitácora (PDF)</button>
           </div>
           {visibles.length===0 ? (
             <div style={{ background:t.card, border:`1px dashed ${t.border}`, borderRadius:t.radius, padding:26, textAlign:'center', color:t.muted, fontSize:12.5 }}>Aún no hay visitas registradas.</div>
@@ -220,7 +220,7 @@ function SalaNeurobienestar({ t, roster }){
             ))}
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10 }}>
-            <button onClick={()=>imprimirSala(sala.data)} style={{ background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Descargar informe (PDF)</button>
+            <button onClick={()=>imprimirSala(sala.data,'informe')} style={{ background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Descargar informe (PDF)</button>
           </div>
           <Panel t={t} titulo="Evolución de ingresos por mes"><ColBar t={t} datos={ind.evol} color={t.primary} /></Panel>
           <Panel t={t} titulo="Uso de la sala por ciclo escolar"><BarrasH t={t} datos={ind.ciclos} color="#2563B8" pct /></Panel>
@@ -254,7 +254,9 @@ function SalaNeurobienestar({ t, roster }){
 }
 
 // ── Informe imprimible de la Sala ──
-function imprimirSala(data){
+function imprimirSala(data, modo){
+  const soloBitacora = modo==='bitacora';
+  const soloInforme = modo==='informe';
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const logo = location.origin+location.pathname.replace(/[^/]*$/,'')+'logo-blanco.png';
   const cnt=(key)=>{ const o={}; data.forEach(r=>{ const k=r[key]||'—'; o[k]=(o[k]||0)+1; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); };
@@ -270,14 +272,14 @@ function imprimirSala(data){
   h2{font-size:12px;color:#2C7A6B;margin:18px 0 7px;text-transform:uppercase;letter-spacing:.5px}
   table{width:100%;border-collapse:collapse;font-size:11px}th{background:#EAF2EF;color:#2C7A6B;text-align:left;padding:7px 9px;font-size:9.5px;text-transform:uppercase}td{padding:6px 9px;border-bottom:1px solid #e6ebe9}
   .ft{margin-top:18px;text-align:center;font-size:8.5px;color:#999;border-top:1px solid #ddd;padding-top:7px}@media print{.noprint{display:none}}</style></head><body>
-  <div class="head"><img src="${logo}" onerror="this.style.display='none'"><div><h1>Informe · Sala de Neurobienestar</h1><p>Colegio Mayor Peñalolén · Equipo Psicoeducativo</p></div></div>
+  <div class="head"><img src="${logo}" onerror="this.style.display='none'"><div><h1>${soloBitacora?'Bitácora':'Informe'} · Sala de Neurobienestar</h1><p>Colegio Mayor Peñalolén · Equipo Psicoeducativo</p></div></div>
   <div class="kpis"><div class="kpi"><b>${data.length}</b><span>Visitas registradas</span></div><div class="kpi"><b>${prom} min</b><span>Tiempo promedio</span></div><div class="kpi"><b>${[...new Set(data.map(r=>r.estNombre))].length}</b><span>Estudiantes distintos</span></div></div>
-  ${tabla('Uso por ciclo escolar', cnt('ciclo'), true)}
+  ${soloBitacora?'':`${tabla('Uso por ciclo escolar', cnt('ciclo'), true)}
   ${tabla('Motivos de ingreso', cnt('motivo'), true)}
   ${tabla('Materiales más utilizados', mats)}
   ${tabla('Profesional que acompaña', cnt('profesional'))}
-  ${tabla('Estudiantes con mayor cantidad de visitas', topEst)}
-  <h2>Bitácora completa</h2><table><thead><tr><th>Fecha</th><th>Estudiante</th><th>Curso</th><th>Horario</th><th style="text-align:center">Min</th><th>Motivo</th><th>Estado final</th></tr></thead><tbody>${bit||'<tr><td colspan="7" style="text-align:center;color:#999">Sin registros</td></tr>'}</tbody></table>
+  ${tabla('Estudiantes con mayor cantidad de visitas', topEst)}`}
+  ${soloInforme?'':`<h2>Bitácora completa</h2><table><thead><tr><th>Fecha</th><th>Estudiante</th><th>Curso</th><th>Horario</th><th style="text-align:center">Min</th><th>Motivo</th><th>Estado final</th></tr></thead><tbody>${bit||'<tr><td colspan="7" style="text-align:center;color:#999">Sin registros</td></tr>'}</tbody></table>`}
   <div class="ft">Generado el ${new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})} · Documento confidencial de uso interno</div>
   <div class="noprint" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#2C7A6B;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button></div>
   </body></html>`;

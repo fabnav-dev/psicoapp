@@ -2852,6 +2852,7 @@ function GestionDashboard({ t, revisiones }){
               </div>
             </div>
           ); })()}
+          {(window.salaResumenGestion && window.salaResumenGestion().total>0) && <window.SalaNeurobienestar t={t} roster={[]} soloIndicadores />}
           <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:20, marginBottom:14, display:'flex', alignItems:'center', gap:22, flexWrap:'wrap' }}>
             <Anillo pct={colegio.pct} size={104} />
             <div style={{ flex:1, minWidth:180 }}>
