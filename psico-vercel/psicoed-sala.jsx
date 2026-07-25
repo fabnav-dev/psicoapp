@@ -23,8 +23,9 @@ function minutosEntre(hi,hf){ if(!hi||!hf) return ''; const [a,b]=hi.split(':').
 function mesCorto(fecha){ const M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; const d=new Date(fecha+'T00:00'); return isNaN(d)?'—':M[d.getMonth()]; }
 
 // ── Gráfico de barras horizontal reutilizable ──
-function BarrasH({ t, datos, color }){
+function BarrasH({ t, datos, color, pct }){
   const max=Math.max(1,...datos.map(d=>d.v));
+  const tot=datos.reduce((a,d)=>a+d.v,0)||1;
   if(!datos.length) return <div style={{ fontSize:11.5, color:t.muted, fontStyle:'italic', padding:'8px 2px' }}>Sin datos aún.</div>;
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     {datos.map((d,i)=>(
@@ -32,7 +33,7 @@ function BarrasH({ t, datos, color }){
         <div style={{ width:'42%', fontSize:11, color:t.ink, textAlign:'right', lineHeight:1.25 }}>{d.l}</div>
         <div style={{ flex:1, display:'flex', alignItems:'center', gap:7 }}>
           <div style={{ height:16, width:`${Math.max(6,d.v/max*100)}%`, background:d.c||color, borderRadius:5, transition:'width .4s' }} />
-          <span style={{ fontSize:11, fontWeight:800, color:t.ink }}>{d.v}</span>
+          <span style={{ fontSize:11, fontWeight:800, color:t.ink }}>{d.v}{pct?<span style={{ color:t.muted, fontWeight:600 }}> · {Math.round(d.v/tot*100)}%</span>:''}</span>
         </div>
       </div>
     ))}
@@ -93,7 +94,11 @@ function SalaNeurobienestar({ t, roster }){
     const estO={}; d.forEach(r=>{ estO[r.estNombre]=(estO[r.estNombre]||0)+1; }); const topEst=Object.entries(estO).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([l,v])=>({ l, v }));
     const motivos=Object.entries(cnt('motivo')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({ l, v }));
     const totMin=d.reduce((a,r)=>a+(r.minutos||0),0);
-    return { evol, ciclos, mats, tiempo, prof, topEst, motivos, total:d.length, prom: d.length?Math.round(totMin/d.length):0 };
+    // Efectividad: nivel de estado (0=alta alerta, 1=modulado, 2=óptimo). Mejora si ef>ei.
+    const nivel=(s)=>SALA_ESTADOS.indexOf(s);
+    let mejora=0, igual=0, baja=0; d.forEach(r=>{ const a=nivel(r.ei), b=nivel(r.ef); if(a<0||b<0) return; if(b>a) mejora++; else if(b===a) igual++; else baja++; });
+    const efectividad = d.length? Math.round(mejora/d.length*100):0;
+    return { evol, ciclos, mats, tiempo, prof, topEst, motivos, total:d.length, prom: d.length?Math.round(totMin/d.length):0, efectividad, mejora, igual, baja };
   },[sala.data]);
 
   const inputS={ width:'100%', padding:'9px 11px', borderRadius:9, border:`1px solid ${t.border}`, fontSize:12.5, outline:'none', background:t.card, color:t.ink };
@@ -218,10 +223,27 @@ function SalaNeurobienestar({ t, roster }){
             <button onClick={()=>imprimirSala(sala.data)} style={{ background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 13px', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Descargar informe (PDF)</button>
           </div>
           <Panel t={t} titulo="Evolución de ingresos por mes"><ColBar t={t} datos={ind.evol} color={t.primary} /></Panel>
-          <Panel t={t} titulo="Uso de la sala por ciclo escolar"><BarrasH t={t} datos={ind.ciclos} color="#2563B8" /></Panel>
-          <Panel t={t} titulo="Motivos de ingreso"><BarrasH t={t} datos={ind.motivos} color="#7A4FB0" /></Panel>
+          <Panel t={t} titulo="Uso de la sala por ciclo escolar"><BarrasH t={t} datos={ind.ciclos} color="#2563B8" pct /></Panel>
+          <Panel t={t} titulo="Motivos de ingreso"><BarrasH t={t} datos={ind.motivos} color="#7A4FB0" pct /></Panel>
           <Panel t={t} titulo="Materiales y herramientas más utilizados"><BarrasH t={t} datos={ind.mats} color="#1B9E8A" /></Panel>
-          <Panel t={t} titulo="Tiempo de permanencia"><BarrasH t={t} datos={ind.tiempo} color="#C2841E" /></Panel>
+          <Panel t={t} titulo="Efectividad de la regulación">
+            <div style={{ display:'flex', alignItems:'center', gap:18, flexWrap:'wrap' }}>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontFamily:t.display, fontSize:34, fontWeight:700, color:'#1E7A53' }}>{ind.efectividad}%</div>
+                <div style={{ fontSize:10, color:t.muted, maxWidth:120 }}>de las visitas el estudiante mejora su estado de regulación</div>
+              </div>
+              <div style={{ flex:1, minWidth:180, display:'flex', flexDirection:'column', gap:7 }}>
+                {[['Mejoró (salió más regulado)', ind.mejora, '#1E7A53'],['Se mantuvo igual', ind.igual, '#B8860B'],['Empeoró', ind.baja, '#C2410C']].map(([l,v,c])=>{ const tot=ind.total||1; return (
+                  <div key={l} style={{ display:'flex', alignItems:'center', gap:9 }}>
+                    <div style={{ flex:1, fontSize:11, color:t.ink }}>{l}</div>
+                    <div style={{ width:'38%', height:12, background:t.soft, borderRadius:5, overflow:'hidden' }}><div style={{ height:'100%', width:`${v/tot*100}%`, background:c, borderRadius:5 }} /></div>
+                    <div style={{ fontSize:11, fontWeight:800, color:t.ink, width:62, textAlign:'right' }}>{v} · {Math.round(v/tot*100)}%</div>
+                  </div>
+                );})}
+              </div>
+            </div>
+          </Panel>
+          <Panel t={t} titulo="Tiempo de permanencia"><BarrasH t={t} datos={ind.tiempo} color="#C2841E" pct /></Panel>
           <Panel t={t} titulo="Profesional que acompaña"><BarrasH t={t} datos={ind.prof} color="#E8634C" /></Panel>
           <Panel t={t} titulo="Estudiantes con mayor cantidad de visitas"><BarrasH t={t} datos={ind.topEst} color="#2C7A6B" /></Panel>
         </div>
@@ -237,7 +259,7 @@ function imprimirSala(data){
   const logo = location.origin+location.pathname.replace(/[^/]*$/,'')+'logo-blanco.png';
   const cnt=(key)=>{ const o={}; data.forEach(r=>{ const k=r[key]||'—'; o[k]=(o[k]||0)+1; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); };
   const totMin=data.reduce((a,r)=>a+(r.minutos||0),0); const prom=data.length?Math.round(totMin/data.length):0;
-  const tabla=(titulo,rows)=> rows.length?`<h2>${titulo}</h2><table><tbody>${rows.map(([l,v])=>`<tr><td>${esc(l)}</td><td style="text-align:right;font-weight:700;width:70px">${v}</td></tr>`).join('')}</tbody></table>`:'';
+  const tabla=(titulo,rows,pct)=> rows.length?`<h2>${titulo}</h2><table><tbody>${(()=>{ const tot=rows.reduce((a,r)=>a+r[1],0)||1; return rows.map(([l,v])=>`<tr><td>${esc(l)}</td><td style="text-align:right;font-weight:700;width:60px">${v}</td>${pct?`<td style="text-align:right;width:60px;color:#5a6b64">${Math.round(v/tot*100)}%</td>`:''}</tr>`).join(''); })()}</tbody></table>`:'';
   const matO={}; data.forEach(r=>(r.mats||[]).forEach(m=>{ matO[m]=(matO[m]||0)+1; })); const mats=Object.entries(matO).sort((a,b)=>b[1]-a[1]);
   const estO={}; data.forEach(r=>{ estO[r.estNombre]=(estO[r.estNombre]||0)+1; }); const topEst=Object.entries(estO).sort((a,b)=>b[1]-a[1]).slice(0,10);
   const bit=data.map(r=>`<tr><td>${esc(r.fecha)}</td><td>${esc(r.estNombre)}</td><td>${esc(r.curso)}</td><td>${esc(r.hi)}–${esc(r.hf)}</td><td style="text-align:center">${r.minutos}</td><td>${esc(r.motivo)}</td><td>${esc(r.ef)}</td></tr>`).join('');
@@ -250,8 +272,8 @@ function imprimirSala(data){
   .ft{margin-top:18px;text-align:center;font-size:8.5px;color:#999;border-top:1px solid #ddd;padding-top:7px}@media print{.noprint{display:none}}</style></head><body>
   <div class="head"><img src="${logo}" onerror="this.style.display='none'"><div><h1>Informe · Sala de Neurobienestar</h1><p>Colegio Mayor Peñalolén · Equipo Psicoeducativo</p></div></div>
   <div class="kpis"><div class="kpi"><b>${data.length}</b><span>Visitas registradas</span></div><div class="kpi"><b>${prom} min</b><span>Tiempo promedio</span></div><div class="kpi"><b>${[...new Set(data.map(r=>r.estNombre))].length}</b><span>Estudiantes distintos</span></div></div>
-  ${tabla('Uso por ciclo escolar', cnt('ciclo'))}
-  ${tabla('Motivos de ingreso', cnt('motivo'))}
+  ${tabla('Uso por ciclo escolar', cnt('ciclo'), true)}
+  ${tabla('Motivos de ingreso', cnt('motivo'), true)}
   ${tabla('Materiales más utilizados', mats)}
   ${tabla('Profesional que acompaña', cnt('profesional'))}
   ${tabla('Estudiantes con mayor cantidad de visitas', topEst)}
