@@ -86,7 +86,7 @@ function SalaNeurobienestar({ t, roster, soloIndicadores }){
     const porMes={}; d.forEach(r=>{ const m=mesCorto(r.fecha); porMes[m]=(porMes[m]||0)+1; });
     const ORD=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
     const evol=ORD.filter(m=>porMes[m]).map(m=>({ l:m, v:porMes[m] }));
-    const cnt=(key)=>{ const o={}; d.forEach(r=>{ const k=r[key]||'—'; o[k]=(o[k]||0)+1; }); return o; };
+    const cnt=(key)=>{ const o={}; d.forEach(r=>{ let k=r[key]||'—'; if(key==='ciclo'&&k==='Ciclo Superior') k='Tercer Ciclo'; o[k]=(o[k]||0)+1; }); return o; };
     const ciclos=Object.entries(cnt('ciclo')).map(([l,v])=>({ l, v }));
     const matO={}; d.forEach(r=>(r.mats||[]).forEach(m=>{ matO[m]=(matO[m]||0)+1; })); const mats=Object.entries(matO).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({ l, v }));
     const buckets={ '0–10 min':0,'11–20 min':0,'21–30 min':0,'+30 min':0 }; d.forEach(r=>{ const m=r.minutos||0; if(m<=10)buckets['0–10 min']++; else if(m<=20)buckets['11–20 min']++; else if(m<=30)buckets['21–30 min']++; else buckets['+30 min']++; }); const tiempo=Object.entries(buckets).map(([l,v])=>({ l, v }));
@@ -286,4 +286,4 @@ function imprimirSala(data, modo){
   const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
 }
 
-Object.assign(window, { SalaNeurobienestar, useSala, salaResumenGestion: ()=>{ const d=_lg('psico_sala_v1',[]); const totMin=d.reduce((a,r)=>a+(r.minutos||0),0); const porCiclo={}; d.forEach(r=>{ porCiclo[r.ciclo||'—']=(porCiclo[r.ciclo||'—']||0)+1; }); const top=Object.entries(porCiclo).sort((a,b)=>b[1]-a[1])[0]; return { total:d.length, prom:d.length?Math.round(totMin/d.length):0, cicloTop: top?top[0]:'—', estudiantes:[...new Set(d.map(r=>r.estNombre))].length }; } });
+Object.assign(window, { SalaNeurobienestar, useSala, salaResumenGestion: ()=>{ const d=_lg('psico_sala_v1',[]); const totMin=d.reduce((a,r)=>a+(r.minutos||0),0); const porCiclo={}; d.forEach(r=>{ let c=r.ciclo||'—'; if(c==='Ciclo Superior') c='Tercer Ciclo'; porCiclo[c]=(porCiclo[c]||0)+1; }); const top=Object.entries(porCiclo).sort((a,b)=>b[1]-a[1])[0]; return { total:d.length, prom:d.length?Math.round(totMin/d.length):0, cicloTop: top?top[0]:'—', estudiantes:[...new Set(d.map(r=>r.estNombre))].length }; } });
