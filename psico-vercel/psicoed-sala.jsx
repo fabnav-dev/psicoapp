@@ -11,6 +11,7 @@ const SALA_ESTADOS = ['Desregulado / Alerta Alta','Alerta Modulada / Basal','Reg
 const SALA_MATERIALES = ['Columpios','Tabla de equilibrio','Piscina de pelotas','Carpa tipi','Mesa sensorial','Arena mágica','Material de respiración','Peso / manta','Rincón oscuro','Música / sonido'];
 const SALA_EST_COL = { 'Desregulado / Alerta Alta':'#C2410C', 'Alerta Modulada / Basal':'#B8860B', 'Regulado / Alerta Óptima':'#1E7A53' };
 
+const SalaLeaf = ({ c='#2C7A6B', s=22 })=>(<svg width={s} height={s} viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke={c} strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke={c} strokeWidth="2" strokeLinecap="round"/></svg>);
 function useSala(){
   const [data,setData]=useStateS(()=>_lg('psico_sala_v1',[]));
   useEffectS(()=>{ const h=()=>setData(_lg('psico_sala_v1',[])); window.addEventListener('sala-change',h); window.addEventListener('storage',h); return ()=>{ window.removeEventListener('sala-change',h); window.removeEventListener('storage',h); }; },[]);
@@ -101,7 +102,7 @@ function SalaNeurobienestar({ t, roster }){
   return (
     <div className="fade">
       <div style={{ display:'flex', alignItems:'center', gap:11, marginBottom:6 }}>
-        <div style={{ width:40, height:40, borderRadius:12, background:t.primary+'1a', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>🌿</div>
+        <div style={{ width:40, height:40, borderRadius:12, background:t.primary+'1a', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><SalaLeaf c={t.primary} s={22} /></div>
         <div><div style={{ fontFamily:t.display, fontSize:18, fontWeight:700, color:t.ink }}>Sala de Neurobienestar</div>
           <div style={{ fontSize:11, color:t.muted }}>Registro de uso y acompañamiento · {ind.total} visita{ind.total!==1?'s':''}</div></div>
       </div>

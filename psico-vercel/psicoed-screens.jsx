@@ -2844,7 +2844,7 @@ function GestionDashboard({ t, revisiones }){
         <div className="fade" id="gestion-print">
           {(()=>{ const s=(window.salaResumenGestion?window.salaResumenGestion():{total:0,prom:0,cicloTop:'—',estudiantes:0}); if(!s.total) return null; return (
             <div style={{ background:'#EAF3F0', border:'1px solid #C9E3DB', borderRadius:t.radius, padding:'13px 16px', marginBottom:14 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.4, marginBottom:9, display:'flex', alignItems:'center', gap:7 }}><span>🌿</span>Sala de Neurobienestar</div>
+              <div style={{ fontSize:11, fontWeight:800, color:'#1E7A53', textTransform:'uppercase', letterSpacing:0.4, marginBottom:9, display:'flex', alignItems:'center', gap:7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 5-13 14-14 0 9-5 14-14 14z" stroke="#1E7A53" strokeWidth="2" strokeLinejoin="round"/><path d="M5 19c3-7 7-9 12-10" stroke="#1E7A53" strokeWidth="2" strokeLinecap="round"/></svg>Sala de Neurobienestar</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
                 {[['Visitas del período',s.total],['Tiempo promedio',s.prom+' min'],['Estudiantes',s.estudiantes],['Ciclo que más la usa',s.cicloTop]].map(([l,v])=>(
                   <div key={l}><div style={{ fontFamily:t.display, fontSize:22, fontWeight:700, color:'#1E7A53' }}>{v}</div><div style={{ fontSize:10, color:t.muted, marginTop:1 }}>{l}</div></div>
