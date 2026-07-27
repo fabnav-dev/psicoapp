@@ -446,7 +446,8 @@ function AppHeader({ t, role, onLogout, onSwitch, notifCount, notifs, revisiones
     const _gest=(n)=> (revisiones||[]).some(r=>r.estId===n.estId && (r.estado==='firmado'||r.estado==='archivado'));
     (notifs||[]).filter(n=>n.estado==='nuevo' && !_gest(n)).forEach(n=>pend.push({ ic:'doc', txt:'Informe por procesar', sub:`${n.from} · ${n.curso}` }));
     (revisiones||[]).filter(r=>r.estado==='cambios').forEach(r=>pend.push({ ic:'bell', txt:'Cambios solicitados', sub:`${r.estNombre} · ${r.planNombre}` }));
-    (revisiones||[]).filter(r=>r.estado==='firmado').forEach(r=>pend.push({ ic:'check', txt:'Listo para archivar', sub:`${r.estNombre} · ${r.planNombre}` }));
+    (revisiones||[]).filter(r=>r.estado==='firmado').forEach(r=>{ const fi=r.firmasInternas||[]; const faltan=fi.filter(f=>!f.firma); if(faltan.length>0) pend.push({ ic:'bell', txt:`Firmas pendientes · ${faltan.length}`, sub:`${r.estNombre} · ${faltan.map(f=>f.rol).join(', ')}` }); });
+    (revisiones||[]).filter(r=>r.estado==='archivado').forEach(r=>pend.push({ ic:'check', txt:'Documento completo · imprimir y archivar', sub:`${r.estNombre} · ${r.planNombre}` }));
   } else if(role==='apoderado'){
     (revisiones||[]).filter(r=>r.estado==='en_revision').forEach(r=>pend.push({ ic:'doc', txt:'Documento por firmar', sub:r.planFull }));
     (revisiones||[]).filter(r=>r.estado==='respondido').forEach(r=>pend.push({ ic:'bell', txt:'Respuesta del equipo', sub:r.planFull }));
@@ -506,22 +507,6 @@ const TRAYECTORIA = PILOTO ? {} : {
   e3:[ {a:'2025',t:'Ingreso al programa',d:'Derivación por crisis de ansiedad',k:'doc'},{a:'2025',t:'Trastorno ansioso',d:'Informe psiquiatría',k:'diag'},{a:'2025',t:'Plan Salud Mental',d:'Contención y flexibilización',k:'plan'},{a:'2026',t:'Requiere revisión',d:'Plan vencido, baja adherencia',k:'alerta'} ],
   e5:[ {a:'2022',t:'Ingreso al programa',d:'Derivación temprana',k:'doc'},{a:'2023',t:'Discapacidad intelectual leve',d:'Evaluación psicopedagógica',k:'diag'},{a:'2023',t:'Primer PACI',d:'Adecuaciones curriculares',k:'plan'},{a:'2024',t:'Consolidación de logros',d:'Lectura funcional adquirida',k:'hito'},{a:'2026',t:'PACI vigente',d:'Plan al día y firmado',k:'plan'} ],
 };
-// señales individuales para el semáforo de alerta temprana (demo)
-const ALERTAS_ESTUDIANTE = {
-  e1:{ adherencia:90, diasRevision:20, diasEntrevista:25, reportes:0, planVencido:false },
-  e2:{ adherencia:50, diasRevision:75, diasEntrevista:60, reportes:2, planVencido:true },
-  e3:{ adherencia:33, diasRevision:95, diasEntrevista:80, reportes:3, planVencido:true },
-  e5:{ adherencia:100, diasRevision:30, diasEntrevista:15, reportes:0, planVencido:false },
-};
-function nivelAlerta(s){
-  let p=0;
-  if(s.adherencia<50) p+=3; else if(s.adherencia<70) p+=2;
-  if(s.planVencido) p+=2;
-  if(s.diasRevision>90) p+=2; else if(s.diasRevision>60) p+=1;
-  if(s.diasEntrevista>60) p+=1;
-  p+=Math.min(3,s.reportes);
-  return p>=5?'alto':p>=2?'medio':'bajo';
-}
 
 // ─── Carga de nómina (importación masiva) ────────────────────────
 const normCurso=(c)=>String(c||'').replace(/\s*B[áa]sico|\s*Medio/i,'').replace(/\s/g,'');
@@ -790,6 +775,28 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
               <span style={{ marginLeft:'auto', fontSize:11.5, fontWeight:700, color:t.primary }}>Ver bandeja →</span>
             </button>
           )}
+          {(()=>{
+            const venc=(revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado').map(r=>{ const f=fechaRev(r); if(!f) return null; const dias=Math.ceil((new Date(f.getTime()+365*864e5)-new Date())/864e5); return dias<=60 ? { r, dias } : null; }).filter(Boolean).sort((a,b)=>a.dias-b.dias);
+            if(venc.length===0) return null;
+            const urg=venc.some(v=>v.dias<=0);
+            return (
+              <div style={{ background:urg?'#FBE6E2':'#FCEFD9', border:`1px solid ${urg?'#E8B4AA':'#E8C98A'}`, borderLeft:`4px solid ${urg?'#B23A24':'#C2841E'}`, borderRadius:t.radius, padding:'12px 15px', marginBottom:14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:7 }}>
+                  <Icon k="bell" c={urg?'#B23A24':'#9A6A12'} s={17} />
+                  <span style={{ fontSize:12, fontWeight:800, color:urg?'#B23A24':'#9A6A12' }}>{venc.length} plan{venc.length>1?'es':''} {urg?'vencido(s) o por vencer':'por vencer'}</span>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {venc.slice(0,4).map((v,i)=>(
+                    <div key={i} style={{ fontSize:11, color:t.ink, display:'flex', gap:8 }}>
+                      <span style={{ fontWeight:700 }}>{v.r.estNombre}</span>
+                      <span style={{ color:t.muted }}>{v.r.planNombre||v.r.planId}</span>
+                      <span style={{ marginLeft:'auto', fontWeight:800, color:v.dias<=0?'#B23A24':'#9A6A12' }}>{v.dias<=0?`vencido hace ${Math.abs(v.dias)} d`:`en ${v.dias} d`}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize:9.5, color:t.muted, marginTop:7 }}>Los planes tienen vigencia anual (Decreto 83). Programa la revisión con el equipo.</div>
+              </div>
+            ); })()}
           <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
             <button onClick={()=>setIntake(intake==='import'?null:'import')} style={{ flex:'1 1 150px', padding:'11px 12px', background:intake==='import'?t.primary:t.card, color:intake==='import'?'#fff':t.ink, border:`1px solid ${intake==='import'?t.primary:t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Icon k="download" c={intake==='import'?'#fff':t.primary} s={17} />Importar nómina</button>
             <button onClick={()=>setIntake(intake==='manual'?null:'manual')} style={{ flex:'1 1 150px', padding:'11px 12px', background:intake==='manual'?t.primary:t.card, color:intake==='manual'?'#fff':t.ink, border:`1px solid ${intake==='manual'?t.primary:t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>＋ Nuevo estudiante</button>
@@ -839,8 +846,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
         <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Semáforo de alerta temprana</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:14 }}>Cruza señales individuales —adherencia docente, vigencia del plan, tiempo sin entrevista y reportes de profesores— para anticipar qué estudiantes necesitan atención.</div>
-          {(()=>{ const _MES3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-            const _pf=(s)=>{ const m=String(s||'').match(/(\d{1,2})\s*([a-z]{3})/i); if(!m) return null; const mi=_MES3.indexOf(m[2].toLowerCase()); if(mi<0) return null; const yy=(String(s).match(/(20\d{2})/)||[])[1]; return new Date(yy?parseInt(yy,10):new Date().getFullYear(), mi, parseInt(m[1],10)); };
+          {(()=>{
             const _dias=(d)=> d? Math.floor((new Date()-d)/864e5) : null;
             const apoyos=lsGet('psico_apoyos_v1',{}); const lect=lsGet('psico_lectura_v1',{}); const casos=lsGet('psico_caso_v1',{}); const nrm=(s)=>String(s||'').trim().toLowerCase();
             const lista=roster.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)).map(e=>{
@@ -849,38 +855,46 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
               const asigs=[...new Set((apoyos[e.id]||[]).map(a=>a.asignatura).filter(Boolean))];
               const confs=[...new Set((lect[e.id]||[]).map(x=>nrm(x.asignatura)).filter(Boolean))];
               const adherencia = asigs.length ? Math.round(asigs.filter(a=>confs.includes(nrm(a))).length/asigs.length*100) : null;
-              const ultFirma = firmadas.map(r=>_pf(r.fechaFirma)).filter(Boolean).sort((a,b)=>b-a)[0]||null;
+              const ultFirma = firmadas.map(r=>fechaRev(r)).filter(Boolean).sort((a,b)=>b-a)[0]||null;
               const diasRevision = _dias(ultFirma);
               const planVencido = !!(ultFirma && diasRevision>365);
               const ents=((casos[e.id]||{}).entrevistas)||[];
-              const ultEnt = ents.map(x=>_pf(x.fecha)).filter(Boolean).sort((a,b)=>b-a)[0]||null;
+              const ultEnt = ents.map(x=>parseFechaES(x.fecha)).filter(Boolean).sort((a,b)=>b-a)[0]||null;
               const diasEntrevista = _dias(ultEnt);
               const sinPlan = firmadas.length===0;
-              const s={ adherencia, diasRevision, diasEntrevista, planVencido, sinPlan, sinApoyos:asigs.length===0 };
+              // Antigüedad del caso: un caso recién ingresado no es "riesgo", es "nuevo".
+              const fIngreso = parseFechaES((inf.data[e.id]||{}).fecha);
+              const diasCaso = _dias(fIngreso);
+              const esNuevo = (diasCaso==null) ? (firmadas.length===0 && ents.length===0 && asigs.length===0) : diasCaso<=30;
+              const s={ adherencia, diasRevision, diasEntrevista, planVencido, sinPlan, sinApoyos:asigs.length===0, nuevo:esNuevo, diasCaso };
               let p=0;
               if(adherencia!=null){ if(adherencia<50)p+=3; else if(adherencia<70)p+=2; }
               if(planVencido)p+=3;
-              if(sinPlan)p+=2;
-              if(s.sinApoyos)p+=1;
+              if(!esNuevo){
+                // Las señales de "aún no hecho" escalan con la antigüedad del caso:
+                // un caso abandonado (meses sin plan) debe llegar a riesgo alto.
+                if(sinPlan) p += (diasCaso!=null && diasCaso>180) ? 4 : (diasCaso!=null && diasCaso>90) ? 3 : 2;
+                if(s.sinApoyos) p += (diasCaso!=null && diasCaso>90) ? 2 : 1;
+                if(ents.length===0) p += (diasCaso!=null && diasCaso>90) ? 2 : 1;
+              }
               if(diasRevision!=null && diasRevision>180)p+=2; else if(diasRevision!=null && diasRevision>90)p+=1;
               if(diasEntrevista!=null && diasEntrevista>90)p+=1;
-              if(ents.length===0)p+=1;
-              return { e, s, lvl: p>=4?'alto': p>=2?'medio':'bajo' };
+              return { e, s, lvl: esNuevo?'nuevo': p>=5?'alto': p>=2?'medio':'bajo' };
             });
-            const orden={alto:0,medio:1,bajo:2}; lista.sort((a,b)=>orden[a.lvl]-orden[b.lvl]);
-            const COL={ alto:{c:'#B23A24',bg:'#FBE6E2',lbl:'Riesgo alto'}, medio:{c:'#2563B8',bg:'#E8F0FB',lbl:'Atención'}, bajo:{c:'#1E7A53',bg:'#E2F3EC',lbl:'Estable'} };
+            const orden={alto:0,medio:1,nuevo:2,bajo:3}; lista.sort((a,b)=>orden[a.lvl]-orden[b.lvl]);
+            const COL={ alto:{c:'#B23A24',bg:'#FBE6E2',lbl:'Riesgo alto'}, medio:{c:'#2563B8',bg:'#E8F0FB',lbl:'Atención'}, nuevo:{c:'#9A6A12',bg:'#FBF2DC',lbl:'Caso nuevo'}, bajo:{c:'#1E7A53',bg:'#E2F3EC',lbl:'Estable'} };
             if(lista.length===0) return (<div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:26, textAlign:'center', color:t.muted, fontSize:12.5 }}>Aún no hay estudiantes en seguimiento. El semáforo se activa cuando haya casos con informe o plan.</div>);
             return (<React.Fragment>
               <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-                {['alto','medio','bajo'].map(k=>{ const n=lista.filter(x=>x.lvl===k).length; return (
-                  <div key={k} style={{ flex:1, background:COL[k].bg, borderRadius:t.radius, padding:'11px 12px', textAlign:'center' }}>
-                    <div style={{ fontSize:22, fontWeight:800, color:COL[k].c }}>{n}</div>
-                    <div style={{ fontSize:10, color:COL[k].c, fontWeight:700 }}>{COL[k].lbl}</div>
+                {['alto','medio','nuevo','bajo'].map(k=>{ const n=lista.filter(x=>x.lvl===k).length; return (
+                  <div key={k} style={{ flex:1, background:COL[k].bg, borderRadius:t.radius, padding:'11px 8px', textAlign:'center' }}>
+                    <div style={{ fontSize:20, fontWeight:800, color:COL[k].c }}>{n}</div>
+                    <div style={{ fontSize:9.5, color:COL[k].c, fontWeight:700 }}>{COL[k].lbl}</div>
                   </div>
                 );})}
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                {lista.map(({e,s,lvl})=>{ const señales=[]; if(s.adherencia!=null && s.adherencia<70)señales.push(`Adherencia docente ${s.adherencia}%`); if(s.planVencido)señales.push('Plan vencido'); if(s.sinPlan)señales.push('Sin plan firmado'); if(s.sinApoyos)señales.push('Sin apoyos reportados'); if(s.diasRevision!=null && s.diasRevision>90)señales.push(`${s.diasRevision} días sin revisión`); if(s.diasEntrevista!=null && s.diasEntrevista>90)señales.push(`${s.diasEntrevista} días sin entrevista`); if(s.diasEntrevista==null)señales.push('Sin entrevistas registradas');
+                {lista.map(({e,s,lvl})=>{ const señales=[]; if(lvl!=='nuevo'){ if(s.adherencia!=null && s.adherencia<70)señales.push(`Adherencia docente ${s.adherencia}%`); if(s.planVencido)señales.push('Plan vencido'); if(s.sinPlan)señales.push(s.diasCaso!=null && s.diasCaso>90 ? `Sin plan firmado hace ${s.diasCaso} días` : 'Sin plan firmado'); if(s.sinApoyos)señales.push('Sin apoyos reportados'); if(s.diasRevision!=null && s.diasRevision>90)señales.push(`${s.diasRevision} días sin revisión`); if(s.diasEntrevista!=null && s.diasEntrevista>90)señales.push(`${s.diasEntrevista} días sin entrevista`); }
                   return (
                   <button key={e.id} onClick={()=>setSel(e)} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderLeft:`4px solid ${COL[lvl].c}`, borderRadius:t.radius, padding:'13px 15px', display:'flex', gap:12, alignItems:'flex-start' }}>
                     <div style={{ width:12, height:12, borderRadius:'50%', background:COL[lvl].c, flexShrink:0, marginTop:3 }} />
@@ -890,7 +904,8 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
                         <span style={{ flexShrink:0, fontSize:9.5, fontWeight:800, color:COL[lvl].c, background:COL[lvl].bg, padding:'2px 9px', borderRadius:99 }}>{COL[lvl].lbl}</span>
                       </div>
                       <div style={{ fontSize:10.5, color:t.muted, marginTop:1 }}>{e.curso}{(()=>{ const d=(lsGet('psico_datos_v1',{})[e.id]||{}).diag||e.diag; return d?` · ${d}`:''; })()}</div>
-                      {señales.length>0 && lvl!=='bajo' && <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:8 }}>{señales.map((sg,i)=><span key={i} style={{ fontSize:9.5, fontWeight:600, color:COL[lvl].c, background:COL[lvl].bg, padding:'2px 8px', borderRadius:6 }}>{sg}</span>)}</div>}
+                      {señales.length>0 && lvl!=='bajo' && lvl!=='nuevo' && <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:8 }}>{señales.map((sg,i)=><span key={i} style={{ fontSize:9.5, fontWeight:600, color:COL[lvl].c, background:COL[lvl].bg, padding:'2px 8px', borderRadius:6 }}>{sg}</span>)}</div>}
+                      {lvl==='nuevo' && <div style={{ fontSize:10, color:'#9A6A12', marginTop:6, fontWeight:600 }}>Caso recién ingresado{s.diasCaso!=null?` (hace ${s.diasCaso} días)`:''} · en proceso de elaboración</div>}
                       {lvl==='bajo' && <div style={{ fontSize:10, color:'#1E7A53', marginTop:6, fontWeight:600 }}>✓ Apoyos aplicándose con normalidad</div>}
                     </div>
                   </button>
@@ -995,7 +1010,12 @@ function CursoEstudiantes({ t, curso, extra, revisiones, onBack, onSel }){
       <div style={{ fontFamily:t.display, fontSize:22, fontWeight:700, color:t.ink, marginBottom:3 }}>Curso {curso}</div>
       <div style={{ fontSize:12, color:t.muted, marginBottom:16 }}>{lista.length} estudiante{lista.length!==1?'s':''} en la nómina · <b style={{ color:t.primary }}>{enSeg}</b> en seguimiento NEE</div>
       {lista.length>0 && (
-        <button onClick={()=>imprimirCodigosCurso(curso, lista)} style={{ background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7, marginBottom:14 }}><Icon k="doc" c={t.primary} s={16} />Lista de códigos de vinculación (imprimir / PDF)</button>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
+          <button onClick={()=>imprimirCodigosCurso(curso, lista)} style={{ background:t.soft, color:t.primaryDark, border:`1px solid ${t.border}`, borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7 }}><Icon k="doc" c={t.primary} s={16} />Lista de códigos de vinculación</button>
+          {(()=>{ const conNee=lista.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)); if(conNee.length===0) return null; return (
+            <button onClick={()=>imprimirExpedientesCurso(curso, conNee, revisiones)} style={{ background:t.primary, color:'#fff', border:'none', borderRadius:10, padding:'9px 14px', fontSize:12, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7 }}><Icon k="download" c="#fff" s={16} />Exportar {conNee.length} expediente{conNee.length>1?'s':''} del curso</button>
+          ); })()}
+        </div>
       )}
       {lista.length===0 ? (
         <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:30, textAlign:'center', color:t.muted, fontSize:12.5 }}>Este curso no tiene estudiantes en la nómina todavía.</div>
@@ -1690,7 +1710,7 @@ function imprimirInformeMedico(est){
 }
 
 // ─── Expediente completo del estudiante (portabilidad) ──────────
-function imprimirExpediente(est, revisiones){
+function imprimirExpediente(est, revisiones, soloHTML){
   const esc=(s)=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const hoy=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
   const mias=(revisiones||[]).filter(r=>r.estId===est.id);
@@ -1760,7 +1780,24 @@ function imprimirExpediente(est, revisiones){
   </div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
   </body></html>`;
+  if(soloHTML) return html;
   const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
+}
+
+// Exporta en UN solo documento los expedientes de todos los estudiantes NEE del curso.
+function imprimirExpedientesCurso(curso, lista, revisiones){
+  const w=window.open('','_blank'); // abierto dentro del gesto del usuario (evita bloqueo de pop-ups)
+  if(!w){ alert('El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio y vuelve a intentarlo.'); return; }
+  const partes=(lista||[]).map(e=>{
+    const full=imprimirExpediente(e, revisiones, true);
+    const mb=full.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    let cuerpo=mb?mb[1]:'';
+    cuerpo=cuerpo.replace(/<script[\s\S]*?<\/script>/gi,'');
+    return '<section class="exp">'+cuerpo+'</section>';
+  });
+  const mh=(imprimirExpediente(lista[0], revisiones, true).match(/<style>([\s\S]*?)<\/style>/i)||[])[1]||'';
+  const html='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Expedientes · Curso '+curso+'</title><style>'+mh+' .exp{page-break-after:always} .exp:last-child{page-break-after:auto}</style></head><body>'+partes.join('')+'<script>window.onload=function(){setTimeout(function(){window.print();},600);};<\/script></body></html>';
+  w.document.write(html); w.document.close();
 }
 
 // ─── Exportación de todos los expedientes del colegio (portabilidad) ──
@@ -2238,8 +2275,8 @@ function ProfesorDashboard({ t }){
 // ════════════════ APODERADO ═════════════════════════════════════
 function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarCambios }){
   const [phase,setPhase]=useState('idle'); // idle | uploading | done
-  const [hist,setHist]=useState(()=>lsGet('psico_apo_hist_v1',[]));
-  useEffect(()=>{ lsSet('psico_apo_hist_v1', hist); },[hist]);
+  const [hist,setHist]=useState(()=>lsGet('psico_apo_hist_'+((window.PSICO_USER&&window.PSICO_USER.id)||'anon'),[]));
+  useEffect(()=>{ lsSet('psico_apo_hist_'+((window.PSICO_USER&&window.PSICO_USER.id)||'anon'), hist); },[hist]);
   const [revisando,setRevisando]=useState(null); // documento en pantalla de revisión
   // Hijos vinculados: guardados en la CUENTA del apoderado (metadata) → disponibles en
   // cualquier dispositivo/navegador, y privados (no se comparten con otros apoderados).
@@ -2492,7 +2529,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
       {/* historial */}
       <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:10 }}>Informes enviados</div>
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-        {hist.filter(h=>!h.estId || h.estId===hijo).map((h,i)=>(
+        {hist.filter(h=>h.estId===hijo).map((h,i)=>(
           <div key={i} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'12px 14px', display:'flex', alignItems:'center', gap:11 }}>
             <div style={{ width:36, height:36, borderRadius:9, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon k="doc" c={t.primary} s={18} /></div>
             <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:12.5, fontWeight:600, color:t.ink }}>{h.doc}</div><div style={{ fontSize:10.5, color:t.muted }}>{h.fecha}</div></div>
@@ -2723,11 +2760,9 @@ function GestionDashboard({ t, revisiones }){
   const GC = gestionRowsReales();
   const colegio = aggrega(GC);
   // Planes por vencer: derivado de revisiones firmadas/archivadas (vigencia anual real)
-  const MES3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const vence = (revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado').map(r=>{
-    const m=(String(r.fechaFirma||'').match(/(\d{1,2})\s*([a-z]{3})/i)); if(!m) return null;
-    const dia=parseInt(m[1],10); const mi=MES3.indexOf(m[2].toLowerCase()); if(mi<0) return null;
-    const firma=new Date(2026,mi,dia); const vto=new Date(firma.getTime()+365*864e5);
+    const firma=fechaRev(r); if(!firma) return null;
+    const vto=new Date(firma.getTime()+365*864e5);
     const dias=Math.ceil((vto-new Date())/864e5);
     return (dias>0 && dias<=30) ? { curso:normCurso(r.curso), plan:r.planNombre||r.planId, dias } : null;
   }).filter(Boolean);
@@ -2824,11 +2859,9 @@ function GestionDashboard({ t, revisiones }){
       {/* AHORRO DE TIEMPO · ROI */}
       {tab==='ahorro' && (()=>{
         const fmt=(n)=>'$'+Math.round(n).toLocaleString('es-CL');
-        const MES3A=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-        const parseFecha=(s)=>{ const m=String(s||'').match(/(\d{1,2})\s*([a-z]{3})/i); if(!m) return null; const dia=parseInt(m[1],10); const mi=MES3A.indexOf(m[2].toLowerCase()); if(mi<0) return null; const yy=(String(s).match(/(20\d{2})/)||[])[1]; return new Date(yy?parseInt(yy,10):new Date().getFullYear(), mi, dia); };
         const firmadas=(revisiones||[]).filter(r=>r.estado==='firmado'||r.estado==='archivado');
         const ahora=new Date(); const inicioSem=new Date(ahora); inicioSem.setDate(ahora.getDate()-6); inicioSem.setHours(0,0,0,0); const inicioMes=new Date(ahora.getFullYear(), ahora.getMonth(), 1); const inicioAnio=new Date(ahora.getFullYear(),0,1);
-        const cuenta=(desde)=> firmadas.filter(r=>{ const f=parseFecha(r.fechaFirma); return f? f>=desde : false; }).length;
+        const cuenta=(desde)=> firmadas.filter(r=>{ const f=fechaRev(r); return f? f>=desde : false; }).length;
         const AH={ horasPorDoc:3.5, valorHora:14000, docsSemana:cuenta(inicioSem), docsMes:cuenta(inicioMes), docsAnio:(cuenta(inicioAnio)||firmadas.length) };
         const hSem=Math.round(AH.docsSemana*AH.horasPorDoc);
         const hMes=Math.round(AH.docsMes*AH.horasPorDoc);
@@ -3324,6 +3357,21 @@ const DESREG_SEED = {
 };
 const SALUD_NIVEL = { alto:{c:'#B23A24',bg:'#FBE6E2',lbl:'Riesgo alto'}, medio:{c:'#C2841E',bg:'#FCEFD9',lbl:'Atención'}, bajo:{c:'#1E7A53',bg:'#E2F3EC',lbl:'Estable'} };
 
+// Fecha de firma → Date. Acepta fechaFirmaISO, "27 jul 2026" y "27 de julio de 2026".
+const _MESES_ES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function parseFechaES(s){
+  if(!s) return null;
+  if(s instanceof Date) return s;
+  const str=String(s);
+  if(/^\d{4}-\d{2}-\d{2}T/.test(str)){ const d=new Date(str); return isNaN(d)?null:d; }
+  const m=str.match(/(\d{1,2})\s*(?:de\s+)?([a-záéíóúA-ZÁÉÍÓÚ]{3,})/);
+  if(!m) return null;
+  const mi=_MESES_ES.indexOf(m[2].toLowerCase().slice(0,3));
+  if(mi<0) return null;
+  const yy=(str.match(/(20\d{2})/)||[])[1];
+  return new Date(yy?parseInt(yy,10):new Date().getFullYear(), mi, parseInt(m[1],10));
+}
+function fechaRev(r){ return parseFechaES((r&&r.fechaFirmaISO)||(r&&r.fechaFirma)); }
 function hoyStr(){ return new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}); }
 // Registro de auditoría real: agrega una entrada [hora, actor, acción] (máx 30)
 function auditPush(actor, accion){
