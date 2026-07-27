@@ -1744,7 +1744,7 @@ function imprimirExpediente(est, revisiones, soloHTML){
     .tr-t{font-size:12px;font-weight:700;color:#22303B} .tr-yr{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:99px;margin-right:5px}
     .tr-d{font-size:10.5px;color:#7A8A85;margin-top:2px;line-height:1.4}
     .foot{margin-top:24px;text-align:center;color:#98A6A1;font-size:10px}
-    .anx{page-break-inside:avoid;margin-bottom:20px} .doc-h{font-family:Georgia,serif;font-size:16px;color:#2C7A6B;margin:16px 0 3px} .doc-meta{font-size:10.5px;color:#7A8A85;margin-bottom:8px}
+    .anx{page-break-inside:avoid;margin-bottom:20px} .doc-h{font-size:13px;font-weight:800;color:#2C7A6B;text-transform:uppercase;letter-spacing:.6px;margin:16px 0 3px;border-bottom:1px solid #DCE7E3;padding-bottom:4px} .doc-meta{font-size:10.5px;color:#7A8A85;margin-bottom:8px}
     .agt{font-size:11px;font-weight:800;color:#2C7A6B;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 5px} .anx ul{margin:0 0 8px;padding-left:18px} .anx li{font-size:12px;margin-bottom:3px} .anx p{font-size:12px;line-height:1.5;margin:0 0 8px} .ag{margin-bottom:8px} .empty{font-size:11px;color:#98A6A1;font-style:italic}
   </style></head><body>
   <div class="head"><div class="col">Colegio Mayor Peñalolén · Equipo Psicoeducativo</div><h1>Expediente del estudiante</h1><div class="sub">Carpeta completa de documentos · generado el ${hoy}</div></div>
