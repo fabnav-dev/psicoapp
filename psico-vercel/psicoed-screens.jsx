@@ -348,8 +348,8 @@ function Onboarding({ t, onPick }){
     { id:'gestion', title:'Gestión · Rectoría y Dirección', desc:'Estado de avance por curso, ciclo y colegio' },
   ];
   return (
-    <div style={{ height:'100%', background:t.headerGrad, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-      <div style={{ maxWidth:480, width:'100%', textAlign:'center', color:'#fff' }} className="fade">
+    <div style={{ minHeight:'100%', background:t.headerGrad, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:24 }}>
+      <div style={{ maxWidth:480, width:'100%', textAlign:'center', color:'#fff', margin:'auto 0' }} className="fade">
         <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-start', gap:18, marginBottom:18, flexWrap:'nowrap' }}>
           <span style={{ flexShrink:0 }}><Logo size={200} /></span>
           <div style={{ textAlign:'left', flexShrink:0 }}>
@@ -447,7 +447,7 @@ function AppHeader({ t, role, onLogout, onSwitch, notifCount, notifs, revisiones
     (notifs||[]).filter(n=>n.estado==='nuevo' && !_gest(n)).forEach(n=>pend.push({ ic:'doc', txt:'Informe por procesar', sub:`${n.from} · ${n.curso}` }));
     (revisiones||[]).filter(r=>r.estado==='cambios').forEach(r=>pend.push({ ic:'bell', txt:'Cambios solicitados', sub:`${r.estNombre} · ${r.planNombre}` }));
     (revisiones||[]).filter(r=>r.estado==='firmado').forEach(r=>{ const fi=r.firmasInternas||[]; const faltan=fi.filter(f=>!f.firma); if(faltan.length>0) pend.push({ ic:'bell', txt:`Firmas pendientes · ${faltan.length}`, sub:`${r.estNombre} · ${faltan.map(f=>f.rol).join(', ')}` }); });
-    (revisiones||[]).filter(r=>r.estado==='archivado').forEach(r=>pend.push({ ic:'check', txt:'Documento completo · imprimir y archivar', sub:`${r.estNombre} · ${r.planNombre}` }));
+    (revisiones||[]).filter(r=>r.estado==='archivado').filter(r=>{ const f=fechaRev(r); return f && (new Date()-f)<=7*864e5; }).forEach(r=>pend.push({ ic:'check', txt:'Documento completo · imprimir y archivar', sub:`${r.estNombre} · ${r.planNombre}` }));
   } else if(role==='apoderado'){
     (revisiones||[]).filter(r=>r.estado==='en_revision').forEach(r=>pend.push({ ic:'doc', txt:'Documento por firmar', sub:r.planFull }));
     (revisiones||[]).filter(r=>r.estado==='respondido').forEach(r=>pend.push({ ic:'bell', txt:'Respuesta del equipo', sub:r.planFull }));
@@ -865,7 +865,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
               // Antigüedad del caso: un caso recién ingresado no es "riesgo", es "nuevo".
               const fIngreso = parseFechaES((inf.data[e.id]||{}).fecha);
               const diasCaso = _dias(fIngreso);
-              const esNuevo = (diasCaso==null) ? (firmadas.length===0 && ents.length===0 && asigs.length===0) : diasCaso<=30;
+              const esNuevo = firmadas.length>0 ? false : ((diasCaso==null) ? (ents.length===0 && asigs.length===0) : diasCaso<=30);
               const s={ adherencia, diasRevision, diasEntrevista, planVencido, sinPlan, sinApoyos:asigs.length===0, nuevo:esNuevo, diasCaso };
               let p=0;
               if(adherencia!=null){ if(adherencia<50)p+=3; else if(adherencia<70)p+=2; }

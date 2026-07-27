@@ -176,8 +176,8 @@ function LoginCloudPsico({ base, role, onBack }){
   const inp = { width:'100%', padding:'12px 14px', borderRadius:11, border:'1px solid rgba(0,0,0,0.12)', fontSize:14, marginTop:9, outline:'none' };
   const lbl = { fontSize:11.5, fontWeight:700, color:P.muted, textTransform:'uppercase', letterSpacing:0.4 };
   return (
-    <div style={{ height:'100%', background:P.headerGrad, display:'flex', alignItems:'center', justifyContent:'center', padding:24, fontFamily:P.font, overflowY:'auto' }}>
-      <div style={{ maxWidth:380, width:'100%' }} className="scale">
+    <div style={{ minHeight:'100%', background:P.headerGrad, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:24, fontFamily:P.font, overflowY:'auto' }}>
+      <div style={{ maxWidth:380, width:'100%', margin:'auto 0' }} className="scale">
         <div style={{ textAlign:'center', color:'#fff', marginBottom:18 }}>
           <img src="logo-blanco.png" height={156} style={{ width:'auto', objectFit:'contain' }} onError={e=>{e.target.style.display='none';}} alt="" />
           <div style={{ fontFamily:P.display||P.font, fontSize:21, fontWeight:700, marginTop:10 }}>App Psicoeducativa</div>
@@ -273,7 +273,7 @@ function App(){
   }
 
   return (
-    <div style={{ height:'100%', fontFamily:t.font, background:a11y.contrast?'#fff':t.bg, position:'relative', overflow:'hidden' }}>
+    <div style={{ height:'100%', fontFamily:t.font, background:a11y.contrast?'#fff':t.bg, position:'relative', overflowX:'hidden', overflowY:'auto' }}>
       <window.A11yControl a11y={a11y} setA11y={setA11y} t={t} dark={dark} setDark={setDark} />
       {screen==='app' && role==='equipo' && <window.CopilotoIA t={t} />}
       <div style={{ height:'100%', zoom:a11y.scale, filter:a11y.contrast?'contrast(1.22)':'none' }}>
