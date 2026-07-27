@@ -839,9 +839,37 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
         <div className="fade">
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Semáforo de alerta temprana</div>
           <div style={{ fontSize:11, color:t.muted, marginBottom:14 }}>Cruza señales individuales —adherencia docente, vigencia del plan, tiempo sin entrevista y reportes de profesores— para anticipar qué estudiantes necesitan atención.</div>
-          {(()=>{ const lista=ESTUDIANTES.filter(e=>ALERTAS_ESTUDIANTE[e.id]).map(e=>({ e, s:ALERTAS_ESTUDIANTE[e.id], lvl:nivelAlerta(ALERTAS_ESTUDIANTE[e.id]) }));
+          {(()=>{ const _MES3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+            const _pf=(s)=>{ const m=String(s||'').match(/(\d{1,2})\s*([a-z]{3})/i); if(!m) return null; const mi=_MES3.indexOf(m[2].toLowerCase()); if(mi<0) return null; const yy=(String(s).match(/(20\d{2})/)||[])[1]; return new Date(yy?parseInt(yy,10):new Date().getFullYear(), mi, parseInt(m[1],10)); };
+            const _dias=(d)=> d? Math.floor((new Date()-d)/864e5) : null;
+            const apoyos=lsGet('psico_apoyos_v1',{}); const lect=lsGet('psico_lectura_v1',{}); const casos=lsGet('psico_caso_v1',{}); const nrm=(s)=>String(s||'').trim().toLowerCase();
+            const lista=roster.filter(e=>enSeguimiento(e,inf.data,revisiones,seg)).map(e=>{
+              const misRev=(revisiones||[]).filter(r=>r.estId===e.id);
+              const firmadas=misRev.filter(r=>r.estado==='firmado'||r.estado==='archivado');
+              const asigs=[...new Set((apoyos[e.id]||[]).map(a=>a.asignatura).filter(Boolean))];
+              const confs=[...new Set((lect[e.id]||[]).map(x=>nrm(x.asignatura)).filter(Boolean))];
+              const adherencia = asigs.length ? Math.round(asigs.filter(a=>confs.includes(nrm(a))).length/asigs.length*100) : null;
+              const ultFirma = firmadas.map(r=>_pf(r.fechaFirma)).filter(Boolean).sort((a,b)=>b-a)[0]||null;
+              const diasRevision = _dias(ultFirma);
+              const planVencido = !!(ultFirma && diasRevision>365);
+              const ents=((casos[e.id]||{}).entrevistas)||[];
+              const ultEnt = ents.map(x=>_pf(x.fecha)).filter(Boolean).sort((a,b)=>b-a)[0]||null;
+              const diasEntrevista = _dias(ultEnt);
+              const sinPlan = firmadas.length===0;
+              const s={ adherencia, diasRevision, diasEntrevista, planVencido, sinPlan, sinApoyos:asigs.length===0 };
+              let p=0;
+              if(adherencia!=null){ if(adherencia<50)p+=3; else if(adherencia<70)p+=2; }
+              if(planVencido)p+=3;
+              if(sinPlan)p+=2;
+              if(s.sinApoyos)p+=1;
+              if(diasRevision!=null && diasRevision>180)p+=2; else if(diasRevision!=null && diasRevision>90)p+=1;
+              if(diasEntrevista!=null && diasEntrevista>90)p+=1;
+              if(ents.length===0)p+=1;
+              return { e, s, lvl: p>=4?'alto': p>=2?'medio':'bajo' };
+            });
             const orden={alto:0,medio:1,bajo:2}; lista.sort((a,b)=>orden[a.lvl]-orden[b.lvl]);
             const COL={ alto:{c:'#B23A24',bg:'#FBE6E2',lbl:'Riesgo alto'}, medio:{c:'#2563B8',bg:'#E8F0FB',lbl:'Atención'}, bajo:{c:'#1E7A53',bg:'#E2F3EC',lbl:'Estable'} };
+            if(lista.length===0) return (<div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:26, textAlign:'center', color:t.muted, fontSize:12.5 }}>Aún no hay estudiantes en seguimiento. El semáforo se activa cuando haya casos con informe o plan.</div>);
             return (<React.Fragment>
               <div style={{ display:'flex', gap:8, marginBottom:14 }}>
                 {['alto','medio','bajo'].map(k=>{ const n=lista.filter(x=>x.lvl===k).length; return (
@@ -852,7 +880,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
                 );})}
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                {lista.map(({e,s,lvl})=>{ const señales=[]; if(s.adherencia<70)señales.push(`Adherencia docente ${s.adherencia}%`); if(s.planVencido)señales.push('Plan vencido'); if(s.diasRevision>60)señales.push(`${s.diasRevision} días sin revisión`); if(s.diasEntrevista>60)señales.push(`${s.diasEntrevista} días sin entrevista`); if(s.reportes>0)señales.push(`${s.reportes} reporte(s) de profesores`);
+                {lista.map(({e,s,lvl})=>{ const señales=[]; if(s.adherencia!=null && s.adherencia<70)señales.push(`Adherencia docente ${s.adherencia}%`); if(s.planVencido)señales.push('Plan vencido'); if(s.sinPlan)señales.push('Sin plan firmado'); if(s.sinApoyos)señales.push('Sin apoyos reportados'); if(s.diasRevision!=null && s.diasRevision>90)señales.push(`${s.diasRevision} días sin revisión`); if(s.diasEntrevista!=null && s.diasEntrevista>90)señales.push(`${s.diasEntrevista} días sin entrevista`); if(s.diasEntrevista==null)señales.push('Sin entrevistas registradas');
                   return (
                   <button key={e.id} onClick={()=>setSel(e)} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderLeft:`4px solid ${COL[lvl].c}`, borderRadius:t.radius, padding:'13px 15px', display:'flex', gap:12, alignItems:'flex-start' }}>
                     <div style={{ width:12, height:12, borderRadius:'50%', background:COL[lvl].c, flexShrink:0, marginTop:3 }} />
@@ -861,7 +889,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
                         <span style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}</span>
                         <span style={{ flexShrink:0, fontSize:9.5, fontWeight:800, color:COL[lvl].c, background:COL[lvl].bg, padding:'2px 9px', borderRadius:99 }}>{COL[lvl].lbl}</span>
                       </div>
-                      <div style={{ fontSize:10.5, color:t.muted, marginTop:1 }}>{e.curso} · {e.diag}</div>
+                      <div style={{ fontSize:10.5, color:t.muted, marginTop:1 }}>{e.curso}{(()=>{ const d=(lsGet('psico_datos_v1',{})[e.id]||{}).diag||e.diag; return d?` · ${d}`:''; })()}</div>
                       {señales.length>0 && lvl!=='bajo' && <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:8 }}>{señales.map((sg,i)=><span key={i} style={{ fontSize:9.5, fontWeight:600, color:COL[lvl].c, background:COL[lvl].bg, padding:'2px 8px', borderRadius:6 }}>{sg}</span>)}</div>}
                       {lvl==='bajo' && <div style={{ fontSize:10, color:'#1E7A53', marginTop:6, fontWeight:600 }}>✓ Apoyos aplicándose con normalidad</div>}
                     </div>
@@ -2210,7 +2238,8 @@ function ProfesorDashboard({ t }){
 // ════════════════ APODERADO ═════════════════════════════════════
 function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarCambios }){
   const [phase,setPhase]=useState('idle'); // idle | uploading | done
-  const [hist,setHist]=useState(()=> (typeof window!=='undefined'&&window.PSICO_PILOTO) ? [] : [{ doc:'Informe Fonoaudiología.pdf', fecha:'12 mar 2026', estado:'Procesado' }]);
+  const [hist,setHist]=useState(()=>lsGet('psico_apo_hist_v1',[]));
+  useEffect(()=>{ lsSet('psico_apo_hist_v1', hist); },[hist]);
   const [revisando,setRevisando]=useState(null); // documento en pantalla de revisión
   // Hijos vinculados: guardados en la CUENTA del apoderado (metadata) → disponibles en
   // cualquier dispositivo/navegador, y privados (no se comparten con otros apoderados).
@@ -2247,7 +2276,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
       const meta=await subirInformeArchivo(hijo, file);
       inf.cargar(hijo, { ...meta, origen:'Apoderado' });
       onUpload({ from:'Apoderado · '+(hijoSel.nombre||'Apoderado'), curso:normCurso(hijoSel.curso), doc:file.name, fecha:hoyStr(), estId:hijo });
-      setHist(h=>[{ doc:file.name, fecha:'Hoy', estado:'Enviado al equipo' },...h]);
+      setHist(h=>[{ doc:file.name, fecha:hoyStr(), estado:'Enviado al equipo', estId:hijo },...h]);
       setPhase('done');
     }catch(err){ setPhase('idle'); setSubMsg('No se pudo subir el informe: '+(err.message||'error')); }
   };
@@ -2463,7 +2492,7 @@ function ApoderadoDashboard({ t, onUpload, revisiones, aprobarFirmar, solicitarC
       {/* historial */}
       <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:10 }}>Informes enviados</div>
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-        {hist.map((h,i)=>(
+        {hist.filter(h=>!h.estId || h.estId===hijo).map((h,i)=>(
           <div key={i} style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'12px 14px', display:'flex', alignItems:'center', gap:11 }}>
             <div style={{ width:36, height:36, borderRadius:9, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon k="doc" c={t.primary} s={18} /></div>
             <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:12.5, fontWeight:600, color:t.ink }}>{h.doc}</div><div style={{ fontSize:10.5, color:t.muted }}>{h.fecha}</div></div>
