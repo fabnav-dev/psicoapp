@@ -333,7 +333,7 @@ function Icon({ k, c='#fff', s=24 }){
 }
 
 function Chip({ t, label, tone='soft' }){
-  const map = { soft:{bg:t.soft,c:t.primaryDark}, ok:{bg:'#E2F3EC',c:'#1E7A53'}, warn:{bg:'#FCEFD9',c:'#9A6A12'}, alert:{bg:'#FBE6E2',c:'#B23A24'} };
+  const map = { soft:{bg:t.soft,c:t.primaryDark}, ok:{bg:'#E2F3EC',c:'#1E7A53'}, info:{bg:'#E4EEFA',c:'#1F5FA8'}, warn:{bg:'#FCEFD9',c:'#9A6A12'}, alert:{bg:'#FBE6E2',c:'#B23A24'} };
   const m = map[tone]||map.soft;
   return <span style={{ background:m.bg, color:m.c, fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:99 }}>{label}</span>;
 }
@@ -1021,15 +1021,16 @@ function CursoEstudiantes({ t, curso, extra, revisiones, onBack, onSel }){
         <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:30, textAlign:'center', color:t.muted, fontSize:12.5 }}>Este curso no tiene estudiantes en la nómina todavía.</div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-          {lista.map(e=>{ const seguido=enSeguimiento(e,inf.data,revisiones,seg); return (
+          {lista.map(e=>{ const seguido=enSeguimiento(e,inf.data,revisiones,seg); const _rv=(revisiones||[]).filter(r=>r.estId===e.id); const etapa=!seguido?{l:'Sin seguimiento',t:'soft',s:'Directorio · sin seguimiento'}
+            : _rv.some(r=>r.estado==='archivado')?{l:'Plan vigente',t:'ok',s:'Plan archivado y vigente'}
+            : _rv.some(r=>r.estado==='firmado')?{l:'En firmas',t:'info',s:'Firmado por apoderado · firmas del equipo'}
+            : _rv.some(r=>r.estado==='en_revision'||r.estado==='cambios'||r.estado==='borrador')?{l:'En elaboración',t:'warn',s:'Plan en elaboración'}
+            : {l:'Informe recibido',t:'soft',s:'En seguimiento NEE · sin plan aún'}; return (
             <button key={e.id} onClick={()=>onSel(e)} style={{ textAlign:'left', cursor:'pointer', background:t.card, border:`1px solid ${t.border}`, borderRadius:t.radius, padding:'13px 15px', display:'flex', alignItems:'center', gap:13, transition:'all .15s' }}
               onMouseEnter={ev=>ev.currentTarget.style.borderColor=t.primary} onMouseLeave={ev=>ev.currentTarget.style.borderColor=t.border}>
               <div style={{ width:42, height:42, borderRadius:12, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontWeight:700, color:t.primaryDark, fontFamily:t.display }}>{e.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}{e.nuevo && <span style={{ marginLeft:7, fontSize:9.5, fontWeight:800, color:t.primaryDark, background:t.soft, padding:'1px 7px', borderRadius:99 }}>NUEVO</span>}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{!seguido?'Directorio · sin seguimiento':(e.diag&&e.diag!=='—'?e.diag:'En seguimiento NEE')}</div></div>
-              {!seguido && <Chip t={t} label="Directorio" tone="soft" />}
-              {seguido && e.estado==='vigente' && <Chip t={t} label={e.plan+' gestionado'} tone="ok" />}
-              {seguido && e.estado==='borrador' && <Chip t={t} label="En elaboración" tone="warn" />}
-              {seguido && (e.estado==='pendiente'||!e.estado) && <Chip t={t} label="En seguimiento" tone="alert" />}
+              <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:13.5, fontWeight:700, color:t.ink }}>{e.nombre}{e.nuevo && <span style={{ marginLeft:7, fontSize:9.5, fontWeight:800, color:t.primaryDark, background:t.soft, padding:'1px 7px', borderRadius:99 }}>NUEVO</span>}</div><div style={{ fontSize:11, color:t.muted, marginTop:2 }}>{(e.diag&&e.diag!=='—'&&seguido)?e.diag+' · '+etapa.s:etapa.s}</div></div>
+              <Chip t={t} label={etapa.l} tone={etapa.t} />
             </button>
           ); })}
         </div>
