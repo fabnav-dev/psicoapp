@@ -333,7 +333,7 @@ function Icon({ k, c='#fff', s=24 }){
 }
 
 function Chip({ t, label, tone='soft' }){
-  const map = { soft:{bg:t.soft,c:t.primaryDark}, ok:{bg:'#E2F3EC',c:'#1E7A53'}, info:{bg:'#E4EEFA',c:'#1F5FA8'}, warn:{bg:'#FCEFD9',c:'#9A6A12'}, alert:{bg:'#FBE6E2',c:'#B23A24'} };
+  const map = { soft:{bg:t.soft,c:t.primaryDark}, ok:{bg:'#E2F3EC',c:'#1E7A53'}, vig:{bg:'#EDE6F8',c:'#6B3FA0'}, info:{bg:'#E4EEFA',c:'#1F5FA8'}, warn:{bg:'#FCEFD9',c:'#9A6A12'}, alert:{bg:'#FBE6E2',c:'#B23A24'} };
   const m = map[tone]||map.soft;
   return <span style={{ background:m.bg, color:m.c, fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:99 }}>{label}</span>;
 }
@@ -1022,7 +1022,7 @@ function CursoEstudiantes({ t, curso, extra, revisiones, onBack, onSel }){
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {lista.map(e=>{ const seguido=enSeguimiento(e,inf.data,revisiones,seg); const _rv=(revisiones||[]).filter(r=>r.estId===e.id); const etapa=!seguido?{l:'Sin seguimiento',t:'soft',s:'Directorio · sin seguimiento'}
-            : _rv.some(r=>r.estado==='archivado')?{l:'Plan vigente',t:'ok',s:'Plan archivado y vigente'}
+            : _rv.some(r=>r.estado==='archivado')?{l:'Plan vigente',t:'vig',s:'Plan archivado y vigente'}
             : _rv.some(r=>r.estado==='firmado')?{l:'En firmas',t:'info',s:'Firmado por apoderado · firmas del equipo'}
             : _rv.some(r=>r.estado==='en_revision'||r.estado==='cambios'||r.estado==='borrador')?{l:'En elaboración',t:'warn',s:'Plan en elaboración'}
             : {l:'Informe recibido',t:'soft',s:'En seguimiento NEE · sin plan aún'}; return (
