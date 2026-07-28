@@ -681,7 +681,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const [vaciarTxt,setVaciarTxt]=useState('');
   const [histModal,setHistModal]=useState(false);
   const [histTxt,setHistTxt]=useState('');
-  const borrarHistorial=()=>{ try{ const keep=['psico_extra_v1']; Object.keys(localStorage).forEach(k=>{ if(String(k).indexOf('psico_')===0 && keep.indexOf(k)<0) localStorage.removeItem(k); }); }catch(e){} location.replace(location.origin+location.pathname); };
+  const borrarHistorial=()=>{ if(window.psicoResetDocumentos) return window.psicoResetDocumentos(); try{ const keep=['psico_extra_v1']; Object.keys(localStorage).forEach(k=>{ if(String(k).indexOf('psico_')===0 && keep.indexOf(k)<0) localStorage.removeItem(k); }); }catch(e){} location.replace(location.origin+location.pathname); };
   const [extra,setExtra]=useState(()=>lsGet('psico_extra_v1',[]));      // estudiantes cargados (import + manual)
   useEffect(()=>{ lsSet('psico_extra_v1', extra); },[extra]);
   // Al refrescar desde la nube, recarga la nómina para no sobrescribir lo que cargaron otros
@@ -1115,7 +1115,17 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   ] }; });
   useEffect(()=>{ const all=lsGet('psico_caso_v1',{}); all[est.id]=caso; lsSet('psico_caso_v1',all); },[caso,est.id]);
   const [entTxt,setEntTxt]=useState('');
-  const addEntrevista=()=>{ if(!entTxt.trim())return; setCaso(c=>({...c, entrevistas:[...c.entrevistas, { fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), nota:entTxt.trim() }]})); setEntTxt(''); onToast('✓ Entrevista registrada'); };
+  const [entTipo,setEntTipo]=useState('Entrevista apoderado');
+  const [verTodas,setVerTodas]=useState(false);
+  const _autor=()=>{ const u=window.PSICO_USER&&window.PSICO_USER.email; return u?String(u).split('@')[0].replace(/[._]/g,' '):'Equipo'; };
+  const addEntrevista=()=>{ if(!entTxt.trim())return; setCaso(c=>({...c, entrevistas:[...(c.entrevistas||[]), { fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), tipo:entTipo, autor:_autor(), nota:entTxt.trim() }]})); setEntTxt(''); onToast('✓ Registro agregado a la bitácora'); };
+  const delEntrevista=(i)=>{ if(!window.confirm('¿Eliminar este registro de la bitácora?')) return; setCaso(c=>({...c, entrevistas:(c.entrevistas||[]).filter((_,k)=>k!==i)})); onToast('Registro eliminado'); };
+  const marcarRevision=()=>{
+    const nota=window.prompt('Revisión realizada. Nota breve (opcional):','')||'';
+    const prox=window.prompt('Fecha de la próxima revisión (AAAA-MM-DD):', caso.revision||'')||'';
+    setCaso(c=>({...c, revision:/^\d{4}-\d{2}-\d{2}$/.test(prox)?prox:'', revisiones:[...(c.revisiones||[]), { fecha:new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}), responsable:c.responsable||'—', nota:nota.trim(), por:_autor() }]}));
+    onToast('✓ Revisión registrada en el historial');
+  };
   const DIAG_PLANTILLAS = {
     'TEA':[0,1,3], 'TDAH':[1,3], 'ansios':[4], 'intelectual':[0,2], 'def':[0,2] };
   const aplicarPlantilla=()=>{
@@ -1358,19 +1368,50 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
           </div>
         </div>
         {caso.revision && (()=>{ const dias=Math.ceil((new Date(caso.revision)-new Date())/86400000); const venc=dias<0, pronto=dias>=0&&dias<=14; return (
-          <div style={{ background:venc?'#FBE6E2':pronto?'#E8F0FB':t.soft, borderRadius:9, padding:'8px 12px', marginBottom:12, fontSize:11, fontWeight:600, color:venc?'#B23A24':pronto?'#2563B8':t.muted }}>
-            {venc?`Revisión vencida hace ${Math.abs(dias)} días`:pronto?`Revisión en ${dias} días`:`Próxima revisión programada en ${dias} días`}
+          <div style={{ background:venc?'#FBE6E2':pronto?'#E8F0FB':t.soft, borderRadius:9, padding:'8px 12px', marginBottom:10, fontSize:11, fontWeight:600, color:venc?'#B23A24':pronto?'#2563B8':t.muted, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+            <span>{venc?`Revisión vencida hace ${Math.abs(dias)} días`:pronto?`Revisión en ${dias} días`:`Próxima revisión programada en ${dias} días`}</span>
+            <button onClick={marcarRevision} style={{ background:venc?'#B23A24':t.primary, color:'#fff', border:'none', borderRadius:8, padding:'6px 12px', fontSize:10.5, fontWeight:700, cursor:'pointer', flexShrink:0 }}>Marcar revisión realizada</button>
           </div>
         );})()}
-        <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.4, marginBottom:7 }}>Bitácora de entrevistas</div>
-        {caso.entrevistas.map((e,i)=>(
-          <div key={i} style={{ display:'flex', gap:9, marginBottom:7 }}>
-            <span style={{ fontSize:9.5, color:t.muted, fontWeight:700, flexShrink:0, width:64, paddingTop:1 }}>{e.fecha}</span>
-            <span style={{ fontSize:11.5, color:t.ink, lineHeight:1.4 }}>{e.nota}</span>
+        {(caso.revisiones||[]).length>0 && (
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.4, marginBottom:6 }}>Historial de revisiones</div>
+            <div style={{ maxHeight:150, overflowY:'auto', border:`1px solid ${t.border}`, borderRadius:9, padding:'8px 10px', background:t.soft }}>
+              {caso.revisiones.slice().reverse().map((r,i)=>(
+                <div key={i} style={{ display:'flex', gap:9, padding:'5px 0', borderTop:i>0?`1px solid ${t.border}`:'none' }}>
+                  <span style={{ fontSize:9.5, color:t.muted, fontWeight:700, flexShrink:0, width:66, paddingTop:1 }}>{r.fecha}</span>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:t.ink }}>{r.responsable}</div>
+                    {r.nota && <div style={{ fontSize:10.5, color:t.muted, lineHeight:1.4 }}>{r.nota}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-        <div style={{ display:'flex', gap:7, marginTop:8 }}>
-          <input value={entTxt} onChange={e=>setEntTxt(e.target.value)} placeholder="Registrar nueva entrevista…" style={{ flex:1, padding:'8px 11px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, outline:'none' }} />
+        )}
+        <div style={{ fontSize:10.5, fontWeight:800, color:t.primaryDark, textTransform:'uppercase', letterSpacing:0.4, marginBottom:7 }}>Bitácora de entrevistas</div>
+        {(()=>{ const arr=(caso.entrevistas||[]); const idxs=arr.map((_,i)=>i).reverse(); const vis=verTodas?idxs:idxs.slice(0,4); return (<React.Fragment>
+          <div style={{ maxHeight:verTodas?220:'none', overflowY:verTodas?'auto':'visible' }}>
+            {vis.map(idx=>{ const e=arr[idx]; return (
+              <div key={idx} style={{ display:'flex', gap:9, marginBottom:8, alignItems:'flex-start' }}>
+                <span style={{ fontSize:9.5, color:t.muted, fontWeight:700, flexShrink:0, width:66, paddingTop:2 }}>{e.fecha}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  {e.tipo && <div><span style={{ display:'inline-block', background:t.soft, color:t.primaryDark, fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:5, marginBottom:3, textTransform:'uppercase', letterSpacing:0.3 }}>{e.tipo}</span></div>}
+                  <div style={{ fontSize:11.5, color:t.ink, lineHeight:1.45 }}>{e.nota}</div>
+                  {e.autor && <div style={{ fontSize:9.5, color:t.muted, marginTop:2, textTransform:'capitalize' }}>Registró: {e.autor}</div>}
+                </div>
+                <button onClick={()=>delEntrevista(idx)} title="Eliminar" style={{ background:'none', border:'none', color:t.muted, fontSize:13, cursor:'pointer', flexShrink:0, padding:'0 2px' }}>✕</button>
+              </div>
+            );})}
+          </div>
+          {arr.length===0 && <div style={{ fontSize:11, color:t.muted, marginBottom:6, lineHeight:1.5 }}>Aún sin registros. Anota aquí entrevistas con apoderados, reuniones de equipo, observaciones de aula o contactos con especialistas externos.</div>}
+          {arr.length>4 && <button onClick={()=>setVerTodas(v=>!v)} style={{ background:'none', border:'none', color:t.primary, fontSize:10.5, fontWeight:700, cursor:'pointer', padding:0, marginBottom:6 }}>{verTodas?'Ver menos':`Ver todas (${arr.length})`}</button>}
+        </React.Fragment>); })()}
+        <div style={{ display:'flex', gap:7, marginTop:8, flexWrap:'wrap' }}>
+          <select value={entTipo} onChange={e=>setEntTipo(e.target.value)} style={{ padding:'8px 10px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11, background:t.card, color:t.ink, flexShrink:0 }}>
+            {['Entrevista apoderado','Reunión equipo','Observación aula','Contacto especialista externo'].map(o=><option key={o}>{o}</option>)}
+          </select>
+          <input value={entTxt} onChange={e=>setEntTxt(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') addEntrevista(); }} placeholder="Registrar nueva entrada…" style={{ flex:'1 1 160px', padding:'8px 11px', borderRadius:8, border:`1px solid ${t.border}`, fontSize:11.5, outline:'none' }} />
           <button onClick={addEntrevista} style={{ background:t.primary, color:'#fff', border:'none', borderRadius:8, padding:'8px 14px', fontSize:11.5, fontWeight:700, cursor:'pointer', flexShrink:0 }}>＋</button>
         </div>
       </div>
@@ -1820,6 +1861,12 @@ function imprimirExpediente(est, revisiones, soloHTML){
     ${(()=>{ const tr=(typeof TRAYECTORIA!=='undefined' && TRAYECTORIA[est.id])||[]; if(!tr.length) return ''; const KC={doc:'#6B6F92',diag:'#7A4FB0',plan:'#185FA5',hito:'#1E7A53',alerta:'#B23A24'};
       const items=tr.map(h=>`<div class="tr-item"><span class="tr-dot" style="background:${KC[h.k]||'#2C7A6B'}"></span><div><div class="tr-t"><span class="tr-yr" style="background:${(KC[h.k]||'#2C7A6B')}22;color:${KC[h.k]||'#2C7A6B'}">${esc(h.a)}</span> ${esc(h.t)}</div><div class="tr-d">${esc(h.d)}</div></div></div>`).join('');
       return `<h2 style="margin-top:26px">Trayectoria del estudiante</h2><div class="tr">${items}</div>`; })()}
+    ${(()=>{ const c=(typeof lsGet==='function' && (lsGet('psico_caso_v1',{})[est.id]))||{}; const revs=(c.revisiones||[]); const ents=(c.entrevistas||[]); if(!revs.length && !ents.length && !c.responsable) return '';
+      let out=`<h2 style="margin-top:26px">Gestión del caso</h2>`;
+      if(c.responsable) out+=`<p class="p"><b>Responsable del caso:</b> ${esc(c.responsable)}${c.revision?` &nbsp;·&nbsp; <b>Próxima revisión:</b> ${esc(c.revision)}`:''}</p>`;
+      if(revs.length) out+=`<h3 style="font-size:11.5px;color:#2C7A6B;margin:14px 0 5px;text-transform:uppercase;letter-spacing:.5px">Historial de revisiones</h3><table><thead><tr><th style="width:80px">Fecha</th><th>Responsable</th><th>Observación</th></tr></thead><tbody>${revs.map(r=>`<tr><td>${esc(r.fecha)}</td><td>${esc(r.responsable)}</td><td>${esc(r.nota||'—')}</td></tr>`).join('')}</tbody></table>`;
+      if(ents.length) out+=`<h3 style="font-size:11.5px;color:#2C7A6B;margin:14px 0 5px;text-transform:uppercase;letter-spacing:.5px">Bitácora de entrevistas y contactos</h3><table><thead><tr><th style="width:80px">Fecha</th><th style="width:130px">Tipo</th><th>Registro</th><th style="width:90px">Registró</th></tr></thead><tbody>${ents.map(e=>`<tr><td>${esc(e.fecha)}</td><td>${esc(e.tipo||'—')}</td><td>${esc(e.nota)}</td><td>${esc(e.autor||'—')}</td></tr>`).join('')}</tbody></table>`;
+      return out; })()}
     ${(()=>{ const plan=(typeof ptaLoad==='function' && ptaLoad()[est.id])||{}; const rows=[]; (typeof asignaturasFor==='function'?asignaturasFor(est.curso):[]).forEach(asig=>{ const evs=(plan[asig]||[]).slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')); if(evs.length){ const cont=evs.map(e=>{ const f=e.fecha?new Date(e.fecha+'T00:00').toLocaleDateString('es-CL',{day:'2-digit',month:'short'}):'—'; return `<div style="margin-bottom:3px"><b>${esc(e.tipo)}</b> ${esc(e.desc)} <span class="sub">· ${f} · ${esc(e.estado)}${e.profesor?' · '+esc(e.profesor):''}</span></div>`; }).join(''); rows.push(`<tr><td style="width:30%;font-weight:700">${esc(asig)}</td><td>${cont}</td></tr>`); } });
       if(!rows.length) return ''; return `<h2 style="margin-top:26px">Plan de trabajo académico</h2><table>${rows.join('')}</table>`; })()}
     ${(()=>{

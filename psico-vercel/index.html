@@ -115,8 +115,8 @@ async function psicoResetDocumentos(){
   }catch(e){}
   location.replace(location.origin+location.pathname);
 }
-if(/[?&]reset=(borrar|documentos)/.test(location.search)){
-  const _total=/[?&]reset=borrar/.test(location.search);
+window.psicoResetDocumentos = psicoResetDocumentos;
+if(/[?&]reset=(borrar|documentos)/.test(location.search)){  const _total=/[?&]reset=borrar/.test(location.search);
   const _run=()=>{ if(confirm(_total?'¿Borrar TODOS los datos del colegio (incluida la nómina)?':'¿Borrar el historial y la documentación de los estudiantes?\n\nSe eliminan informes, planes, firmas, expedientes y registros.\nLa nómina de estudiantes NO se borra.')) { _total?psicoResetTotal():psicoResetDocumentos(); } else { location.replace(location.origin+location.pathname); } };
   if(CLOUD_ON && window.supabase){ const _sb=window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.anon); _sb.auth.getSession().then(({data})=>{ if(data.session){ _run(); } else { alert('Inicia sesión (Equipo) y vuelve a abrir …/?reset=documentos'); location.replace(location.origin+location.pathname); } }); }
   else { _run(); }
