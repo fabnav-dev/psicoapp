@@ -679,6 +679,9 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const [toast,setToast]=useState(null);
   const [vaciarModal,setVaciarModal]=useState(false);
   const [vaciarTxt,setVaciarTxt]=useState('');
+  const [histModal,setHistModal]=useState(false);
+  const [histTxt,setHistTxt]=useState('');
+  const borrarHistorial=()=>{ try{ const keep=['psico_extra_v1']; Object.keys(localStorage).forEach(k=>{ if(String(k).indexOf('psico_')===0 && keep.indexOf(k)<0) localStorage.removeItem(k); }); }catch(e){} location.replace(location.origin+location.pathname); };
   const [extra,setExtra]=useState(()=>lsGet('psico_extra_v1',[]));      // estudiantes cargados (import + manual)
   useEffect(()=>{ lsSet('psico_extra_v1', extra); },[extra]);
   // Al refrescar desde la nube, recarga la nómina para no sobrescribir lo que cargaron otros
@@ -803,6 +806,7 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
             <button onClick={()=>setIntake(intake==='import'?null:'import')} style={{ flex:'1 1 150px', padding:'11px 12px', background:intake==='import'?t.primary:t.card, color:intake==='import'?'#fff':t.ink, border:`1px solid ${intake==='import'?t.primary:t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Icon k="download" c={intake==='import'?'#fff':t.primary} s={17} />Importar nómina</button>
             <button onClick={()=>setIntake(intake==='manual'?null:'manual')} style={{ flex:'1 1 150px', padding:'11px 12px', background:intake==='manual'?t.primary:t.card, color:intake==='manual'?'#fff':t.ink, border:`1px solid ${intake==='manual'?t.primary:t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>＋ Nuevo estudiante</button>
             {extra.length>0 && <button onClick={vaciarNomina} style={{ flex:'1 1 150px', padding:'11px 12px', background:t.card, color:'#B23A24', border:`1px solid ${t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>Vaciar nómina cargada</button>}
+            <button onClick={()=>{ setHistTxt(''); setHistModal(true); }} style={{ flex:'1 1 150px', padding:'11px 12px', background:t.card, color:'#9A6A12', border:`1px solid ${t.border}`, borderRadius:11, fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>Borrar historial (mantener nómina)</button>
           </div>
           {intake && <IntakePanel t={t} mode={intake} onAdd={agregarEst} onClose={()=>setIntake(null)} />}
           <div style={{ fontSize:12.5, fontWeight:700, color:t.ink, marginBottom:4 }}>Selecciona un curso</div>
@@ -959,6 +963,23 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
         </div>
       )}
       <Toast t={t} msg={toast} />
+      {histModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(20,30,26,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:400, padding:20 }} onClick={()=>setHistModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:16, maxWidth:430, width:'100%', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }} className="scale">
+            <div style={{ background:'#9A6A12', color:'#fff', padding:'14px 18px', display:'flex', alignItems:'center', gap:10, fontSize:15, fontWeight:800 }}><span style={{ fontSize:18 }}>⚠️</span>Borrar historial</div>
+            <div style={{ padding:'18px 18px 20px' }}>
+              <div style={{ fontSize:12.5, color:t.ink, lineHeight:1.55, marginBottom:8 }}>Se borran <b>informes, planes (PAI/PACI/PAEC/PSM), firmas, expedientes, bitácoras y registros</b> de todos los estudiantes.</div>
+              <div style={{ fontSize:12, color:'#1E7A53', fontWeight:700, marginBottom:14 }}>✓ La nómina de estudiantes NO se borra.</div>
+              <div style={{ fontSize:12, color:t.ink, marginBottom:8 }}>Para confirmar, escribe <b>BORRAR</b>:</div>
+              <input autoFocus value={histTxt} onChange={e=>setHistTxt(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && histTxt.trim().toUpperCase()==='BORRAR') borrarHistorial(); }} placeholder="BORRAR" style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:`1px solid ${t.border}`, fontSize:14, fontWeight:700, letterSpacing:1, outline:'none', textAlign:'center', color:t.ink }} />
+              <div style={{ display:'flex', gap:9, marginTop:16 }}>
+                <button onClick={()=>setHistModal(false)} style={{ flex:1, padding:11, background:t.soft, color:t.muted, border:'none', borderRadius:11, fontSize:12.5, fontWeight:700, cursor:'pointer' }}>Cancelar</button>
+                <button disabled={histTxt.trim().toUpperCase()!=='BORRAR'} onClick={borrarHistorial} style={{ flex:1.4, padding:11, background:histTxt.trim().toUpperCase()==='BORRAR'?'#9A6A12':t.soft, color:histTxt.trim().toUpperCase()==='BORRAR'?'#fff':t.muted, border:'none', borderRadius:11, fontSize:12.5, fontWeight:700, cursor:histTxt.trim().toUpperCase()==='BORRAR'?'pointer':'default' }}>Borrar historial</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {vaciarModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(20,30,26,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:400, padding:20 }} onClick={()=>setVaciarModal(false)}>
           <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:16, maxWidth:420, width:'100%', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }} className="scale">
