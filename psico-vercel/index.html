@@ -300,7 +300,7 @@ function App(){
   }
 
   return (
-    <div style={{ height:'100%', fontFamily:t.font, background:a11y.contrast?'#fff':t.bg, position:'relative', overflowX:'hidden', overflowY:'auto' }}>
+    <div style={{ height:'100%', fontFamily:t.font, background:a11y.contrast?'#fff':(screen==='onboarding'?t.primaryDark:t.bg), position:'relative', overflowX:'hidden', overflowY:'auto' }}>
       <window.A11yControl a11y={a11y} setA11y={setA11y} t={t} dark={dark} setDark={setDark} />
       {screen==='app' && role==='equipo' && <window.CopilotoIA t={t} />}
       <div style={{ height:'100%', zoom:a11y.scale, filter:a11y.contrast?'contrast(1.22)':'none' }}>
