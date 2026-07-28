@@ -1083,6 +1083,8 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const seguidoManual=Object.prototype.hasOwnProperty.call(seg,est.id);
   const tieneInforme = esSeedDemo(est) || !!(inf.data[est.id] && (inf.data[est.id].dataUrl || inf.data[est.id].path));
   const [iaSintesis,setIaSintesis]=useState(null);
+  const [alertaId,setAlertaId]=useState(null);   // informe de otro estudiante
+  const [sinVerificar,setSinVerificar]=useState(false); // no se pudo leer el nombre en el informe
   const esNEE = !est.sinNee;
   const [tab,setTab]=useState(esNEE?'resumen':'academico');
   const TABS = esNEE ? [['resumen','Resumen'],['documentos','Documentos'],['academico','Plan académico'],['nee','Plan NEE · Firmas']] : [['academico','Plan de trabajo académico']];
@@ -1120,7 +1122,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
     const rec = inf.data[est.id];
     const seed = esSeedDemo(est);
     if(!seed && !(rec && (rec.dataUrl || rec.path))){ onToast('Primero carga el informe del especialista'); return; }
-    setPhase('generando'); setModo('ia');
+    setPhase('generando'); setModo('ia'); setAlertaId(null); setSinVerificar(false);
     const set = planId==='PAEC' ? ADEC_EVAL : planId==='PSM' ? ADEC_PSM : ADEC_ACCESO;
     const cat = set.map((g,gi)=>`Grupo ${gi} — ${g.tipo}:\n`+g.items.map((it,ii)=>`  ${gi}-${ii}: ${it}`).join('\n')).join('\n');
     const instrucc=`Eres un especialista en educación diferencial (Chile). Debes pre-rellenar un ${plan.full} (${plan.nombre}) para ${est.nombre} (${est.edad||'edad no indicada'}, curso ${est.curso}, diagnóstico ${est.diag||'no indicado'}) a partir EXCLUSIVAMENTE del informe del especialista.\n\nReglas estrictas:\n- Marca SOLO las adecuaciones que el informe respalde de forma explícita o claramente implícita.\n- Si el informe no menciona algo, NO lo marques.\n- El resumen y los objetivos deben basarse ÚNICAMENTE en lo que dice el informe. No inventes datos clínicos ni apoyos que el informe no mencione.\n- Si el informe es ilegible o no aporta información suficiente, devuelve "marcar":[] y explica en "resumen" que el informe no permite determinar las adecuaciones.\n\nLista de adecuaciones posibles (usa las claves gi-ii):\n${cat}\n\nResponde ÚNICAMENTE un JSON válido, sin texto adicional:\n{"resumen":"2-3 frases basadas en el informe","marcar":["gi-ii", ...],"objetivos":["objetivo 1","objetivo 2","objetivo 3"]}`;
@@ -1144,6 +1146,24 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
       const txt=(r||'').replace(/```json|```/g,'').trim();
       const ini=txt.indexOf('{'), fin=txt.lastIndexOf('}');
       const data=JSON.parse(txt.slice(ini,fin+1));
+      // ── Verificación de identidad: ¿el informe es de ESTE estudiante? ──
+      if(!seed){
+        const norm=(s)=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+        const soloDig=(s)=>String(s||'').replace(/[^0-9kK]/g,'').toLowerCase();
+        const pNom=norm(data.paciente), pRut=soloDig(data.pacienteRut);
+        const eNom=norm(est.nombre), eRut=soloDig(est.rut);
+        const tokEst=eNom.split(' ').filter(w=>w.length>2);
+        const tokInf=pNom.split(' ').filter(w=>w.length>2);
+        const comunes=tokEst.filter(w=>tokInf.includes(w)).length;
+        const rutCoincide = (pRut && eRut) ? pRut===eRut : null;
+        const nomCoincide = (pNom && tokEst.length) ? comunes>=Math.min(2,tokEst.length) : null;
+        if(rutCoincide===false || (rutCoincide===null && nomCoincide===false)){
+          const quien=[data.paciente||null, data.pacienteRut||null].filter(Boolean).join(' · ');
+          setMarcadas({}); setIaSintesis(null); setPhase('listo'); setAlertaId(quien||'otro estudiante');
+          return;
+        }
+        setSinVerificar(rutCoincide===null && nomCoincide===null);
+      }
       const m={}; (data.marcar||[]).forEach(k=>{ if(/^\d+-\d+$/.test(k)) m[k]=true; });
       setMarcadas(m);
       setIaSintesis({ resumen:data.resumen||'', objetivos:Array.isArray(data.objetivos)?data.objetivos:[] });
@@ -1432,6 +1452,20 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
             <span style={{ marginLeft:'auto' }}><Chip t={t} label={modo==='manual'?'Manual':'Autocompletado con IA'} tone={modo==='manual'?'soft':'ok'} /></span>
           </div>
 
+          {alertaId && (
+            <div style={{ background:'#FBE6E2', border:'1px solid #E8B4A8', borderLeft:'4px solid #B23A24', borderRadius:t.radius, padding:'14px 16px', marginBottom:12 }} className="fade">
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:7 }}><span style={{ fontSize:16 }}>⚠️</span><span style={{ fontSize:12.5, fontWeight:800, color:'#B23A24' }}>El informe no corresponde a este estudiante</span></div>
+              <div style={{ fontSize:12, color:t.ink, lineHeight:1.55 }}>El documento cargado está a nombre de <b>{alertaId}</b>, pero esta ficha es de <b>{est.nombre}</b>{est.rut?` (${est.rut})`:''}. No se pre-rellenó ninguna adecuación para evitar mezclar información clínica.</div>
+              <div style={{ fontSize:11, color:t.muted, marginTop:7, lineHeight:1.5 }}>Revisa el archivo en el expediente: quita el informe incorrecto y carga el que corresponde a {est.nombre.split(' ')[0]}.</div>
+              <button onClick={()=>setAlertaId(null)} style={{ marginTop:10, padding:'8px 14px', background:'#B23A24', color:'#fff', border:'none', borderRadius:9, fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Entendido</button>
+            </div>
+          )}
+          {sinVerificar && iaSintesis && modo==='ia' && (
+            <div style={{ background:'#FCEFD9', border:'1px solid #E8CFA0', borderLeft:'4px solid #9A6A12', borderRadius:t.radius, padding:'12px 15px', marginBottom:12 }} className="fade">
+              <div style={{ fontSize:12, fontWeight:800, color:'#9A6A12', marginBottom:5 }}>No se pudo verificar la identidad del informe</div>
+              <div style={{ fontSize:11.5, color:t.ink, lineHeight:1.5 }}>El documento no muestra con claridad el nombre ni el RUT del estudiante (escaneo poco legible o informe sin encabezado). <b>Confirma manualmente</b> que este informe corresponde a {est.nombre} antes de continuar con el plan.</div>
+            </div>
+          )}
           {iaSintesis && modo==='ia' && (
             <div style={{ background:'#F3EEFA', border:'1px solid #D9C9F0', borderLeft:`4px solid #7A4FB0`, borderRadius:t.radius, padding:'14px 16px', marginBottom:12 }} className="fade">
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}><Icon k="spark" c="#7A4FB0" s={16} /><span style={{ fontSize:12, fontWeight:800, color:'#7A4FB0' }}>Lectura del informe por IA</span></div>
