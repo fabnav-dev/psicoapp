@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#1E5A4E" />
 <title>App Psicoeducativa · Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -10,7 +11,7 @@
 <style>
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   html { color-scheme:light; }
-  html, body { height:100%; background:#0e1726; }
+  html, body { height:100%; background:#1E5A4E; }
   #root { height:100%; }
   input, textarea, select, button { font-family:inherit; }
   input, textarea, select { background:#fff; color:#1a1a1a; }
@@ -100,9 +101,25 @@ async function psicoResetTotal(){
   }catch(e){}
   location.replace(location.origin+location.pathname);
 }
-if(/[?&]reset=borrar/.test(location.search)){
-  if(CLOUD_ON && window.supabase){ const _sb=window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.anon); _sb.auth.getSession().then(({data})=>{ if(data.session){ psicoResetTotal(); } else { alert('Inicia sesión (Equipo) y vuelve a abrir …/?reset=borrar'); location.replace(location.origin+location.pathname); } }); }
-  else { psicoResetTotal(); }
+// Reinicio de historial y documentación: visita  …/?reset=documentos
+// Borra informes, planes, firmas, expedientes, bitácoras y registros,
+// PERO CONSERVA la nómina de estudiantes ya cargada.
+const KEEP_KEYS = ['psico_extra_v1'];
+async function psicoResetDocumentos(){
+  try{
+    Object.keys(localStorage).forEach(k=>{ if(String(k).indexOf('psico_')===0 && KEEP_KEYS.indexOf(k)<0) localStorage.removeItem(k); });
+    if(CLOUD_ON && sb){
+      const blob={}; KEEP_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null){ try{ blob[k]=JSON.parse(v); }catch(e){} } });
+      try{ await sb.from('psico_estado').update({ data:blob, updated_at:new Date().toISOString() }).eq('workspace', WORKSPACE); }catch(e){}
+    }
+  }catch(e){}
+  location.replace(location.origin+location.pathname);
+}
+if(/[?&]reset=(borrar|documentos)/.test(location.search)){
+  const _total=/[?&]reset=borrar/.test(location.search);
+  const _run=()=>{ if(confirm(_total?'¿Borrar TODOS los datos del colegio (incluida la nómina)?':'¿Borrar el historial y la documentación de los estudiantes?\n\nSe eliminan informes, planes, firmas, expedientes y registros.\nLa nómina de estudiantes NO se borra.')) { _total?psicoResetTotal():psicoResetDocumentos(); } else { location.replace(location.origin+location.pathname); } };
+  if(CLOUD_ON && window.supabase){ const _sb=window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.anon); _sb.auth.getSession().then(({data})=>{ if(data.session){ _run(); } else { alert('Inicia sesión (Equipo) y vuelve a abrir …/?reset=documentos'); location.replace(location.origin+location.pathname); } }); }
+  else { _run(); }
 }
 
 // ─── 3 DIRECCIONES VISUALES ──────────────────────────────────────

@@ -348,13 +348,13 @@ function Onboarding({ t, onPick }){
     { id:'gestion', title:'Gestión · Rectoría y Dirección', desc:'Estado de avance por curso, ciclo y colegio' },
   ];
   return (
-    <div style={{ minHeight:'100%', background:t.headerGrad, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:24 }}>
+    <div style={{ minHeight:'100%', background:t.headerGrad, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'24px 18px' }}>
       <div style={{ maxWidth:480, width:'100%', textAlign:'center', color:'#fff', margin:'auto 0' }} className="fade">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-start', gap:18, marginBottom:18, flexWrap:'nowrap' }}>
-          <span style={{ flexShrink:0 }}><Logo size={200} /></span>
-          <div style={{ textAlign:'left', flexShrink:0 }}>
-            <div style={{ display:'inline-block', background:t.accent, color:t.ink, fontSize:12, fontWeight:800, padding:'5px 14px', borderRadius:6, letterSpacing:0.5, marginBottom:9, textTransform:'uppercase' }}>Colegio Mayor Peñalolén · 2026</div>
-            <div style={{ fontFamily:t.display, fontSize:30, fontWeight:700, color:'#fff', lineHeight:1.05 }}>App Psicoeducativa</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginBottom:18, flexWrap:'wrap' }}>
+          <span style={{ flexShrink:0, display:'block', width:'min(200px, 38vw)' }}><img src="logo-blanco.png" style={{ width:'100%', height:'auto', display:'block' }} alt="Colegio Mayor Peñalolén" /></span>
+          <div style={{ textAlign:'left', minWidth:0, flex:'1 1 200px' }}>
+            <div style={{ display:'inline-block', background:t.accent, color:t.ink, fontSize:'clamp(9.5px,2.6vw,12px)', fontWeight:800, padding:'5px 12px', borderRadius:6, letterSpacing:0.4, marginBottom:9, textTransform:'uppercase' }}>Colegio Mayor Peñalolén · 2026</div>
+            <div style={{ fontFamily:t.display, fontSize:'clamp(22px,6.4vw,30px)', fontWeight:700, color:'#fff', lineHeight:1.05, wordBreak:'break-word' }}>App Psicoeducativa</div>
           </div>
         </div>
         <div style={{ fontSize:13.5, color:'rgba(255,255,255,0.7)', marginTop:4, marginBottom:30 }}>Sistematiza los apoyos para estudiantes con necesidades educativas especiales</div>
