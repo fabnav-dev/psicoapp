@@ -681,6 +681,8 @@ function EquipoDashboard({ t, notifs, setNotifs, revisiones, enviarRevision, res
   const [vaciarTxt,setVaciarTxt]=useState('');
   const [extra,setExtra]=useState(()=>lsGet('psico_extra_v1',[]));      // estudiantes cargados (import + manual)
   useEffect(()=>{ lsSet('psico_extra_v1', extra); },[extra]);
+  // Al refrescar desde la nube, recarga la nómina para no sobrescribir lo que cargaron otros
+  useEffect(()=>{ const h=()=>setExtra(lsGet('psico_extra_v1',[])); window.addEventListener('psico-sync',h); return ()=>window.removeEventListener('psico-sync',h); },[]);
   const [intake,setIntake]=useState(null);  // null | 'import' | 'manual'
   const inf=useInforme();
   const { seg }=useSeguimiento();
@@ -2042,6 +2044,7 @@ function ProfesorDashboard({ t }){
   // apoyos por asignatura reportados por cada profesor: { [estId]: [{asignatura, profesor, correo, apoyos}] } — compartido con Gestión
   const [apoyosAsig,setApoyosAsig]=useState(()=>lsGet('psico_apoyos_v1',{}));
   useEffect(()=>{ lsSet('psico_apoyos_v1', apoyosAsig); },[apoyosAsig]);
+  useEffect(()=>{ const h=()=>{ setApoyosAsig(lsGet('psico_apoyos_v1',{})); setLeidos(lsGet('psico_lectura_v1',{})); }; window.addEventListener('psico-sync',h); return ()=>window.removeEventListener('psico-sync',h); },[]);
   const [form,setForm]=useState({ asignatura:'', profesor:'', correo:'', apoyos:'' });
   const pta=usePTA();
   const [evForm,setEvForm]=useState({ asignatura:ASIGNATURAS_7[0], tipo:'Prueba', desc:'', fecha:'', profesor:'' });

@@ -75,7 +75,7 @@ async function cloudLoad(){
     const blob = data && data.data ? data.data : null;
     if(blob){ Object.keys(blob).forEach(k=>{ try{ localStorage.setItem(k, JSON.stringify(blob[k])); }catch(e){} }); }
   }catch(e){ console.warn('cloudLoad', e.message); }
-  finally{ CLOUD_LOADING = false; window.dispatchEvent(new Event('inf-change')); window.dispatchEvent(new Event('seg-change')); }
+  finally{ CLOUD_LOADING = false; ['inf-change','seg-change','sala-change','lect-change','pta-change','salud-change','desreg-change','psico-sync'].forEach(ev=>window.dispatchEvent(new Event(ev))); }
 }
 // Sube (upsert) todo el estado del colegio como un solo blob compartido
 async function cloudSave(){
