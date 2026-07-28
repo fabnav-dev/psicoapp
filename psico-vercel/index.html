@@ -55,7 +55,7 @@ const sb = CLOUD_ON ? window.supabase.createClient(PSICO_SUPA.url, PSICO_SUPA.an
 window.PSICO_SB = sb; // expuesto para subir/leer informes desde Storage (bucket "informes")
 const WORKSPACE = PSICO_SUPA.workspace || 'colegio';
 // Todas las claves de datos que ya guarda la capa 1 en localStorage
-const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1','psico_seg_v1','psico_salud_v1','psico_desreg_v1','psico_adh_v1','psico_audit_v1','psico_caso_v1','psico_datos_v1','psico_lectura_v1','psico_apoyos_v1','psico_sala_v1'];
+const PKEYS = ['psico_notifs_v1','psico_revisiones_v1','psico_extra_v1','psico_pta_v1','psico_informe_v1','psico_med_v1','psico_expedientes_v1','psico_seg_v1','psico_salud_v1','psico_desreg_v1','psico_adh_v1','psico_audit_v1','psico_caso_v1','psico_datos_v1','psico_lectura_v1','psico_apoyos_v1','psico_sala_v1','psico_impresos_v1'];
 // NOTA: 'psico_apo_hijos_v1' y 'psico_apo_hist_v1' NO se sincronizan al bloque del colegio — los hijos
 // vinculados son PRIVADOS por cuenta de apoderado (se guardan por usuario).
 const ROLES = [
@@ -66,13 +66,16 @@ const ROLES = [
   { id:'salud',     label:'Salud · TENS' },
 ];
 // Trae el estado del colegio desde la nube y lo vuelca en localStorage
+let CLOUD_LOADING = false;
 async function cloudLoad(){
   try{
+    CLOUD_LOADING = true;
     const { data, error } = await sb.from('psico_estado').select('data').eq('workspace', WORKSPACE).maybeSingle();
     if(error){ console.warn('cloudLoad', error.message); return; }
     const blob = data && data.data ? data.data : null;
     if(blob){ Object.keys(blob).forEach(k=>{ try{ localStorage.setItem(k, JSON.stringify(blob[k])); }catch(e){} }); }
   }catch(e){ console.warn('cloudLoad', e.message); }
+  finally{ CLOUD_LOADING = false; window.dispatchEvent(new Event('inf-change')); window.dispatchEvent(new Event('seg-change')); }
 }
 // Sube (upsert) todo el estado del colegio como un solo blob compartido
 async function cloudSave(){
@@ -86,7 +89,7 @@ async function cloudSave(){
 // Marca "sucio" cuando cambia cualquier dato psico_ para disparar el guardado
 if(CLOUD_ON){
   const _set = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = (k, v)=>{ _set(k, v); if(String(k).indexOf('psico_')===0) window.dispatchEvent(new Event('psico-cloud-dirty')); };
+  localStorage.setItem = (k, v)=>{ _set(k, v); if(!CLOUD_LOADING && String(k).indexOf('psico_')===0) window.dispatchEvent(new Event('psico-cloud-dirty')); };
 }
 // Reinicio total (modo piloto): visita  …/?reset=borrar  estando con sesión.
 // Borra TODOS los datos locales psico_ y vacía la fila del colegio en la nube.
@@ -233,6 +236,13 @@ function App(){
   useEffect(()=>{ if(!CLOUD_ON) return; sb.auth.getSession().then(({data})=>{ setSession(data.session); window.PSICO_USER = data.session ? { id:data.session.user.id, email:data.session.user.email, nombre:((data.session.user.user_metadata||{}).nombre)||'', hijos:((data.session.user.user_metadata||{}).hijos)||[] } : null; }); const {data:sub}=sb.auth.onAuthStateChange((_e,s)=>{ setSession(s); window.PSICO_USER = s ? { id:s.user.id, email:s.user.email, nombre:((s.user.user_metadata||{}).nombre)||'', hijos:((s.user.user_metadata||{}).hijos)||[] } : null; }); return ()=>sub.subscription.unsubscribe(); },[]);
   useEffect(()=>{ if(!CLOUD_ON) return; if(!session){ setCloudReady(false); return; } let vivo=true; (async()=>{ await cloudLoad(); if(!vivo) return; setNotifs(LS.get('psico_notifs_v1', [])); setRevisiones(LS.get('psico_revisiones_v1', [])); const r=(session.user.user_metadata||{}).role||null; const eff = role || r; if(eff) setRole(eff); setScreen(eff?'app':'onboarding'); setCloudReady(true); })(); return ()=>{ vivo=false; }; },[session]);
   useEffect(()=>{ if(!CLOUD_ON||!session||!cloudReady) return; let tmr; const h=()=>{ clearTimeout(tmr); tmr=setTimeout(cloudSave,800); }; window.addEventListener('psico-cloud-dirty',h); window.addEventListener('pta-change',h); window.addEventListener('inf-change',h); return ()=>{ window.removeEventListener('psico-cloud-dirty',h); window.removeEventListener('pta-change',h); window.removeEventListener('inf-change',h); clearTimeout(tmr); }; },[session,cloudReady]);
+  // Refresco automático: trae novedades del resto del equipo sin tener que cerrar sesión
+  useEffect(()=>{ if(!CLOUD_ON||!session||!cloudReady) return;
+    const sync=async()=>{ if(document.hidden) return; await cloudLoad(); setNotifs(LS.get('psico_notifs_v1', [])); setRevisiones(LS.get('psico_revisiones_v1', [])); };
+    const id=setInterval(sync, 20000);
+    window.addEventListener('focus', sync);
+    return ()=>{ clearInterval(id); window.removeEventListener('focus', sync); };
+  },[session,cloudReady]);
   const base = THEMES[theme];
   const t = dark ? { ...base, bg:'#12161C', card:'#1B212B', ink:'#E8ECF2', muted:'#9AA6B6', border:'rgba(255,255,255,0.12)', soft:'#252D39' } : base;
 
