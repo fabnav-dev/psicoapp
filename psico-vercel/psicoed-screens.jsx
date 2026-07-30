@@ -353,6 +353,7 @@ function Onboarding({ t, onPick }){
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginBottom:18, flexWrap:'wrap' }}>
           <span style={{ flexShrink:0, display:'block', width:'min(200px, 38vw)' }}><img src="logo-blanco.png" style={{ width:'100%', height:'auto', display:'block' }} alt="Colegio Mayor Peñalolén" /></span>
           <div style={{ textAlign:'left', minWidth:0, flex:'1 1 200px' }}>
+            <div style={{ display:'inline-block', background:t.accent, color:t.ink, fontSize:'clamp(9.5px,2.6vw,12px)', fontWeight:800, padding:'5px 12px', borderRadius:6, letterSpacing:0.4, marginBottom:9, textTransform:'uppercase' }}>Colegio Mayor Peñalolén · 2026</div>
             <div style={{ fontFamily:t.display, fontSize:'clamp(22px,6.4vw,30px)', fontWeight:700, color:'#fff', lineHeight:1.05, wordBreak:'break-word' }}>App Psicoeducativa</div>
           </div>
         </div>
@@ -369,8 +370,7 @@ function Onboarding({ t, onPick }){
             </button>
           ))}
         </div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:24 }}>Colegio Mayor Peñalolén · 2026</div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginTop:8 }}>Elaborado por <span style={{ color:'rgba(255,255,255,0.8)', fontWeight:700 }}>✦ Rumbo</span></div>
+        <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginTop:24 }}>Elaborado por <span style={{ color:'rgba(255,255,255,0.8)', fontWeight:700 }}>✦ Rumbo</span></div>
         <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.38)', marginTop:6 }}>© 2026 Rumbo SpA · Todos los derechos reservados</div>
       </div>
     </div>
