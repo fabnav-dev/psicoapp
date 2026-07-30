@@ -227,7 +227,7 @@ function imprimirPlanAcademico(est, curso, tutor, planData){
   <h2>EVALUACIONES Y TRABAJOS POR ASIGNATURA</h2>
   <table class="adt"><thead><tr><th style="width:26%">Asignatura</th><th>Evaluación · Descripción · Fecha · Estado</th></tr></thead><tbody>${filas}</tbody></table>
   <div class="firma"><div>Profesional del equipo psicoeducativo</div><div>Profesor(a) Tutor(a)</div></div>
-  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
+  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa · © 2026 Rumbo SpA</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
   </body></html>`;
   const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
@@ -372,6 +372,7 @@ function Onboarding({ t, onPick }){
         </div>
         <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:24 }}>Colegio Mayor Peñalolén · 2026</div>
         <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginTop:8 }}>Elaborado por <span style={{ color:'rgba(255,255,255,0.8)', fontWeight:700 }}>✦ Rumbo</span></div>
+        <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.38)', marginTop:6 }}>© 2026 Rumbo SpA · Todos los derechos reservados</div>
       </div>
     </div>
   );
@@ -407,6 +408,7 @@ function Login({ t, role, onLogin, onBack }){
           <div style={{ textAlign:'center', marginTop:10 }}><span onClick={onBack} style={{ fontSize:11.5, color:t.muted, cursor:'pointer', textDecoration:'underline' }}>← Volver al inicio</span></div>
         </div>
         <div style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.5)', marginTop:16 }}>Elaborado por <span style={{ color:'rgba(255,255,255,0.8)', fontWeight:700 }}>✦ Rumbo</span></div>
+        <div style={{ textAlign:'center', fontSize:9.5, color:'rgba(255,255,255,0.38)', marginTop:6 }}>© 2026 Rumbo SpA · Todos los derechos reservados</div>
       </div>
       {recover && (
         <div onClick={()=>setRecover(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, zIndex:400 }}>
@@ -1015,7 +1017,7 @@ function imprimirCodigosCurso(curso, lista){
   <div class="head"><img src="${logo}" onerror="this.style.display='none'"><div><h1>Códigos de vinculación · Curso ${esc(curso)}</h1><p>Colegio Mayor Peñalolén · App Psicoeducativa</p></div></div>
   <div class="nota"><b>Uso interno del equipo.</b> Entregue a cada apoderado el código de su estudiante. Junto con el RUT, es lo que necesita para vincularse en la app y ver <b>solo</b> la información de su hijo/a. No difundir la lista completa.</div>
   <table><thead><tr><th style="width:28px;text-align:center">#</th><th>Estudiante</th><th style="text-align:center">RUT</th><th style="text-align:center">Código</th></tr></thead><tbody>${filas}</tbody></table>
-  <div class="ft">Generado el ${new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})} · ${lista.length} estudiante(s) · Documento confidencial</div>
+  <div class="ft">Generado el ${new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})} · ${lista.length} estudiante(s) · Documento confidencial · © 2026 Rumbo SpA</div>
   <div class="noprint" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="background:#2C7A6B;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button></div>
   </body></html>`;
   const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
@@ -1983,7 +1985,7 @@ function imprimirApoyos(est, curso, tutor, apoyos){
   <h2>APOYOS ENTREGADOS POR ASIGNATURA</h2>
   <table class="adt"><thead><tr><th style="width:24%">Asignatura</th><th>Apoyos entregados · Profesor(a) responsable</th></tr></thead><tbody>${filas||'<tr><td colspan="2">Sin apoyos registrados.</td></tr>'}</tbody></table>
   ${docentes?`<h2>PROFESORES DE ASIGNATURA</h2><div style="font-size:10px;line-height:1.7">${docentes.replace(/<\/span>/g,'</span><br>')}</div>`:''}
-  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
+  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa · © 2026 Rumbo SpA</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
   </body></html>`;
   const w=window.open('','_blank'); w.document.write(html); w.document.close();
@@ -2118,7 +2120,7 @@ function imprimirOficial(plan, est, marcadas, adecSet, fechaElab, resp, director
     }
     return `<div>${esc(f)}</div>`;
   }).join('')}</div>
-  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
+  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa · © 2026 Rumbo SpA</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};</script>
   </body></html>`;
   const w=window.open('','_blank');
@@ -3257,7 +3259,7 @@ function exportarExcel(){
     ${filasDoc}
     ${salaBlock}
     <tr><td colspan="5" style="height:16px"></td></tr>
-    <tr><td colspan="5" style="color:#999;font-size:9px;padding-top:6px">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</td></tr>
+    <tr><td colspan="5" style="color:#999;font-size:9px;padding-top:6px">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa · © 2026 Rumbo SpA</td></tr>
   </table></body></html>`;
   const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -3317,7 +3319,7 @@ function imprimirGestion(colegio){
   <h2>Cumplimiento normativo</h2>
   <table><thead><tr><th>Indicador</th><th style="text-align:center">Cumplimiento</th></tr></thead><tbody>${(()=>{ const g=DOCS_EXP.filter(d=>d.id==='PAI'||d.id==='PACI'); const tot=g.reduce((a,d)=>a+d.total,0), fi=g.reduce((a,d)=>a+d.firmados,0); const d83=tot?Math.round(fi/tot*100):0; const pc=DOCS_EXP.find(d=>d.id==='PAEC'); const d67=pc&&pc.total?Math.round(pc.firmados/pc.total*100):0; const vig=colegio&&colegio.pct?colegio.pct:0; return [['Decreto 83/2015 · Diversificación de la enseñanza',d83],['Decreto 67/2018 · Evaluación y promoción',d67],['Planes con revisión vigente (al día)',vig]]; })().map(([l,p])=>`<tr><td>${esc(l)}</td><td style="text-align:center;color:${tn(p)};font-weight:700">${p}%</td></tr>`).join('')}</tbody></table>
   ${(()=>{ const s=(window.salaResumenGestion?window.salaResumenGestion():{total:0}); if(!s.total) return ''; const d=lsGet('psico_sala_v1',[]); const cnt=(k)=>{ const o={}; d.forEach(r=>{ let v=r[k]||'—'; if(k==='ciclo'&&v==='Ciclo Superior')v='Tercer Ciclo'; o[v]=(o[v]||0)+1; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); }; const tot=d.length||1; const fila=(rows)=>rows.map(([l,v])=>`<tr><td>${String(l).replace(/[&<>]/g,'')}</td><td style="text-align:center">${v}</td><td style="text-align:center">${Math.round(v/tot*100)}%</td></tr>`).join(''); const nivel=(x)=>['Desregulado / Alerta Alta','Alerta Modulada / Basal','Regulado / Alerta Óptima'].indexOf(x); let mej=0,ig=0,baj=0; d.forEach(r=>{ const a=nivel(r.ei), b=nivel(r.ef); if(a<0||b<0) return; if(b>a)mej++; else if(b===a)ig++; else baj++; }); const ef=d.length?Math.round(mej/d.length*100):0; const efFila=[['Mejoró (salió más regulado)',mej],['Se mantuvo igual',ig],['Empeoró',baj]].map(([l,v])=>`<tr><td>${l}</td><td style="text-align:center">${v}</td><td style="text-align:center">${Math.round(v/tot*100)}%</td></tr>`).join(''); return `<h2>Sala de Neurobienestar</h2><table><thead><tr><th>Uso por ciclo escolar</th><th style="text-align:center">Visitas</th><th style="text-align:center">%</th></tr></thead><tbody>${fila(cnt('ciclo'))}</tbody></table><table style="margin-top:8px"><thead><tr><th>Motivo de ingreso</th><th style="text-align:center">Visitas</th><th style="text-align:center">%</th></tr></thead><tbody>${fila(cnt('motivo'))}</tbody></table><table style="margin-top:8px"><thead><tr><th>Efectividad de la regulación (${ef}% mejoró)</th><th style="text-align:center">Visitas</th><th style="text-align:center">%</th></tr></thead><tbody>${efFila}</tbody></table>`; })()}
-  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa</div>
+  <div class="ft">Documento oficial · Colegio Mayor Peñalolén · Generado por App Psicoeducativa · © 2026 Rumbo SpA</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
   </body></html>`);
   w.document.close();

@@ -12,3 +12,6 @@ window.PSICO_SUPA = {
 // MODO PILOTO: true = app limpia (sin estudiantes ni datos de demostración),
 // lista para mostrar/usar en el colegio. Pon false para volver a ver los datos de ejemplo.
 window.PSICO_PILOTO = true;
+// SENTRY: pega aquí el DSN del proyecto "psico-app" (Sentry → Browser JavaScript).
+// Déjalo vacío para desactivar el monitoreo de errores.
+window.PSICO_SENTRY_DSN = "";
