@@ -350,11 +350,11 @@ function Onboarding({ t, onPick }){
   return (
     <div style={{ minHeight:'100%', background:t.headerGrad, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'24px 18px' }}>
       <div style={{ maxWidth:480, width:'100%', textAlign:'center', color:'#fff', margin:'auto 0' }} className="fade">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginBottom:18, flexWrap:'wrap' }}>
-          <span style={{ flexShrink:0, display:'block', width:'min(200px, 38vw)' }}><img src="logo-blanco.png" style={{ width:'100%', height:'auto', display:'block' }} alt="Colegio Mayor Peñalolén" /></span>
-          <div style={{ textAlign:'left', minWidth:0, flex:'1 1 200px' }}>
-            <div style={{ display:'inline-block', background:t.accent, color:t.ink, fontSize:'clamp(9.5px,2.6vw,12px)', fontWeight:800, padding:'5px 12px', borderRadius:6, letterSpacing:0.4, marginBottom:9, textTransform:'uppercase' }}>Colegio Mayor Peñalolén · 2026</div>
-            <div style={{ fontFamily:t.display, fontSize:'clamp(22px,6.4vw,30px)', fontWeight:700, color:'#fff', lineHeight:1.05, wordBreak:'break-word' }}>App Psicoeducativa</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginBottom:18 }}>
+          <span style={{ flexShrink:0, display:'block', width:'min(160px, 32vw)' }}><img src="logo-blanco.png" style={{ width:'100%', height:'auto', display:'block' }} alt="Colegio Mayor Peñalolén" /></span>
+          <div style={{ textAlign:'left', minWidth:0 }}>
+            <div style={{ display:'inline-block', whiteSpace:'nowrap', background:t.accent, color:t.ink, fontSize:'clamp(9px,2.3vw,11px)', fontWeight:800, padding:'5px 12px', borderRadius:6, letterSpacing:0.4, marginBottom:9, textTransform:'uppercase' }}>Colegio Mayor Peñalolén · 2026</div>
+            <div style={{ fontFamily:t.display, fontSize:'clamp(19px,4.6vw,30px)', fontWeight:700, color:'#fff', lineHeight:1.05, whiteSpace:'nowrap' }}>App Psicoeducativa</div>
           </div>
         </div>
         <div style={{ marginBottom:30 }}></div>
