@@ -88,6 +88,87 @@ function shrinkImageDataUrl(dataUrl, maxEdge){
   });
 }
 
+// ─── Foto del estudiante (solo Equipo · bucket "informes") ───────────
+// Dato sensible: se guarda por estudiante, la sube el equipo y NO se imprime.
+const FOTO_KEY = 'psico_fotos_v1';
+let FOTO_MEM = null;
+function fotoLoad(){ if(FOTO_MEM) return FOTO_MEM; try{ FOTO_MEM = JSON.parse(localStorage.getItem(FOTO_KEY)||'{}'); }catch(e){ FOTO_MEM={}; } return FOTO_MEM; }
+function fotoSave(d){ FOTO_MEM = d; try{ localStorage.setItem(FOTO_KEY, JSON.stringify(d)); }catch(e){} window.dispatchEvent(new Event('foto-change')); }
+function useFoto(){
+  const [data,setData]=useState(fotoLoad);
+  useEffect(()=>{ const h=()=>setData(fotoLoad()); window.addEventListener('foto-change',h); window.addEventListener('storage',()=>{ FOTO_MEM=null; setData(fotoLoad()); }); return ()=>window.removeEventListener('foto-change',h); },[]);
+  const guardar=async(estId,file)=>{
+    const du=await new Promise(r=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.readAsDataURL(file); });
+    let small=du; try{ small=await shrinkImageDataUrl(du,420); }catch(_){}
+    const sb=window.PSICO_SB; let rec={ tipo:'image/jpeg', fecha:hoyStr() };
+    if(sb){ try{ const res=await fetch(small); const blob=await res.blob(); const path='fotos/'+estId+'.jpg';
+      const { error } = await sb.storage.from('informes').upload(path, blob, { contentType:'image/jpeg', upsert:true });
+      if(!error) rec.path=path; else rec.dataUrl=small;
+    }catch(_){ rec.dataUrl=small; } } else rec.dataUrl=small;
+    if(!rec.path && !rec.dataUrl) rec.dataUrl=small;
+    const d={...fotoLoad()}; d[estId]=rec; fotoSave(d);
+  };
+  const quitar=(estId)=>{ const d={...fotoLoad()}; delete d[estId]; fotoSave(d); };
+  return { data, guardar, quitar };
+}
+// Avatar del estudiante: foto si existe, iniciales si no. Editable solo por el equipo.
+function AvatarEst({ t, est, size=52, radius=14, editable=false, onOpen }){
+  const foto=useFoto(); const rec=foto.data[est.id];
+  const [url,setUrl]=useState(rec&&rec.dataUrl?rec.dataUrl:null);
+  useEffect(()=>{ let vivo=true; if(rec){ if(rec.dataUrl){ setUrl(rec.dataUrl); } else { urlInforme(rec).then(u=>{ if(vivo) setUrl(u); }); } } else setUrl(null); return ()=>{ vivo=false; }; },[rec&&(rec.path||rec.dataUrl)]);
+  const iniciales=est.nombre.split(' ').map(x=>x[0]).slice(0,2).join('');
+  const base={ width:size, height:size, borderRadius:radius, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, fontSize:size*0.35, flexShrink:0, overflow:'hidden', position:'relative' };
+  if(!editable) return <div style={base}>{url? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : iniciales}</div>;
+  return (
+    <div style={{ position:'relative', flexShrink:0 }}>
+      <button onClick={()=>{ if(url) onOpen&&onOpen(url); else document.getElementById('fotoUp-'+est.id).click(); }}
+        title={url?'Ver foto más grande':'Subir foto del estudiante'}
+        style={{ ...base, border:'none', cursor:'pointer', padding:0 }}
+        onMouseEnter={e=>{ const b=e.currentTarget.querySelector('.fx'); if(b) b.style.opacity='1'; }}
+        onMouseLeave={e=>{ const b=e.currentTarget.querySelector('.fx'); if(b) b.style.opacity=url?'0':'0.92'; }}>
+        {url? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : iniciales}
+        <span className="fx" style={{ position:'absolute', inset:0, background:'rgba(20,45,38,0.55)', display:'flex', alignItems:'center', justifyContent:'center', opacity:0, transition:'opacity .2s' }}>
+          <svg width={size*0.34} height={size*0.34} viewBox="0 0 24 24" fill="none"><path d="M4 8h3l1.6-2h6.8L17 8h3v11H4z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/><circle cx="12" cy="13.5" r="3.2" stroke="#fff" strokeWidth="1.8"/></svg>
+        </span>
+      </button>
+      <input id={'fotoUp-'+est.id} type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{ const fl=e.target.files&&e.target.files[0]; if(fl) foto.guardar(est.id, fl); e.target.value=''; }} />
+    </div>
+  );
+}
+// Ventana flotante arrastrable con la foto del estudiante
+function FotoFlotante({ t, est, url, onClose }){
+  const [pos,setPos]=useState({ x:null, y:null });
+  const drag=useRef(null);
+  const foto=useFoto();
+  useEffect(()=>{
+    const mv=(ev)=>{ if(!drag.current) return; setPos({ x:ev.clientX-drag.current.dx, y:ev.clientY-drag.current.dy }); };
+    const up=()=>{ drag.current=null; };
+    window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+    return ()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); };
+  },[]);
+  const st = pos.x==null
+    ? { right:24, bottom:24 }
+    : { left:Math.max(4,pos.x), top:Math.max(4,pos.y) };
+  return (
+    <div style={{ position:'fixed', ...st, zIndex:500, width:300, background:'#fff', borderRadius:14, overflow:'hidden', boxShadow:'0 22px 60px rgba(0,0,0,0.34)', border:`1px solid ${t.border}` }} className="scale">
+      <div onMouseDown={e=>{ const r=e.currentTarget.parentElement.getBoundingClientRect(); drag.current={ dx:e.clientX-r.left, dy:e.clientY-r.top }; }}
+        style={{ background:t.primary, color:'#fff', padding:'9px 12px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, cursor:'grab' }}>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontSize:12.5, fontWeight:800, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{est.nombre}</div>
+          <div style={{ fontSize:10, opacity:0.85 }}>{est.curso}</div>
+        </div>
+        <button onClick={onClose} title="Cerrar" style={{ background:'rgba(255,255,255,0.18)', border:'none', color:'#fff', width:22, height:22, borderRadius:6, cursor:'pointer', fontSize:12, flexShrink:0 }}>✕</button>
+      </div>
+      <img src={url} alt={est.nombre} style={{ width:'100%', display:'block', background:t.soft }} />
+      <div style={{ display:'flex', gap:7, padding:'9px 11px' }}>
+        <button onClick={()=>document.getElementById('fotoUp-'+est.id).click()} style={{ flex:1, background:t.soft, color:t.primaryDark, border:'none', borderRadius:8, padding:'7px 0', fontSize:11, fontWeight:700, cursor:'pointer' }}>Cambiar foto</button>
+        <button onClick={()=>{ if(window.confirm('¿Quitar la foto de este estudiante?')){ foto.quitar(est.id); onClose(); } }} style={{ flex:1, background:'none', color:t.muted, border:`1px solid ${t.border}`, borderRadius:8, padding:'7px 0', fontSize:11, fontWeight:700, cursor:'pointer' }}>Quitar</button>
+      </div>
+      <div style={{ fontSize:9.5, color:t.muted, padding:'0 11px 10px', lineHeight:1.45 }}>Uso interno del equipo · no se incluye en documentos impresos.</div>
+    </div>
+  );
+}
+
 // ─── Informe médico en Supabase Storage (bucket "informes") ──────────
 // Sube el archivo al bucket y devuelve la ruta; si no hay nube, cae a base64.
 async function subirInformeArchivo(estId, file){
@@ -1105,6 +1186,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
   const seguidoManual=Object.prototype.hasOwnProperty.call(seg,est.id);
   const tieneInforme = esSeedDemo(est) || !!(inf.data[est.id] && (inf.data[est.id].dataUrl || inf.data[est.id].path));
   const [iaSintesis,setIaSintesis]=useState(null);
+  const [fotoBig,setFotoBig]=useState(null);
   const [alertaId,setAlertaId]=useState(null);   // informe de otro estudiante
   const [sinVerificar,setSinVerificar]=useState(false); // no se pudo leer el nombre en el informe
   const esNEE = !est.sinNee;
@@ -1237,7 +1319,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
       {/* identificación */}
       <div style={{ background:t.card, borderRadius:t.radius, border:`1px solid ${t.border}`, padding:16, marginBottom:12 }}>
         <div style={{ display:'flex', alignItems:'center', gap:13 }}>
-          <div style={{ width:52, height:52, borderRadius:14, background:t.soft, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:t.primaryDark, fontFamily:t.display, fontSize:18 }}>{est.nombre.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+          <AvatarEst t={t} est={est} size={52} radius={14} editable onOpen={u=>setFotoBig(u)} />
           <div style={{ flex:1 }}>
             <div style={{ fontFamily:t.display, fontSize:19, fontWeight:600, color:t.ink }}>{est.nombre}</div>
             <div style={{ fontSize:11.5, color:t.muted, marginTop:2 }}>{est.curso}{est.rut?` · ${est.rut}`:''}{esNEE && (datos.diag||datos.edad)?` · ${[datos.edad,datos.diag].filter(Boolean).join(' · ')}`:''}</div>
@@ -1727,6 +1809,7 @@ function FichaEstudiante({ t, est, onBack, onToast, toast, revisiones, enviarRev
       </React.Fragment>)}
       {verInforme && <InformeModal t={t} est={est} rec={inf.data[est.id]} demo={esSeedDemo(est)} onClose={()=>setVerInforme(false)} />}
       <Toast t={t} msg={toast} />
+      {fotoBig && <FotoFlotante t={t} est={est} url={fotoBig} onClose={()=>setFotoBig(null)} />}
     </div>
   );
 }
