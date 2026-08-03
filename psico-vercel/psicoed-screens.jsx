@@ -425,7 +425,7 @@ function Onboarding({ t, onPick }){
     { id:'equipo', title:'Equipo Psicoeducativo', desc:'Educ. diferencial, T. ocupacional y psicología' },
     { id:'profesor', title:'Profesor', desc:'Consulta la síntesis de apoyos de tus estudiantes' },
     { id:'apoderado', title:'Apoderado', desc:'Sube informes de especialistas externos' },
-    { id:'salud', title:'Salud · TENS y RR.HH.', desc:'Estudiantes con medicación y protocolos de contención' },
+    { id:'salud', title:'Salud · TENS', desc:'Estudiantes con medicación y protocolos de contención' },
     { id:'gestion', title:'Gestión · Rectoría y Dirección', desc:'Estado de avance por curso, ciclo y colegio' },
   ];
   return (
